@@ -1,0 +1,84 @@
+/* src/App.css */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f4f7f6;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h1, h2 {
+  color: #005f73;
+}
+
+button {
+  background-color: #0077b6;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+button:hover {
+  background-color: #023e8a;
+}
+
+input {
+  width: calc(100% - 20px);
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.activity-list, .progress-list {
+  list-style: none;
+  padding: 0;
+}
+
+.activity-list li, .progress-list li {
+  background-color: #e9f5f9;
+  margin-bottom: 10px;
+  padding: 15px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.activity-list li:hover {
+  background-color: #d4eff7;
+}
+
+.hint-box {
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  padding: 15px;
+  margin-top: 20px;
+  border-radius: 5px;
+}
+
+.collab-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  padding: 20px;
+  background: white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  border-radius: 10px;
+  text-align: center;
+  z-index: 1000;
+}
