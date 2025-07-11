@@ -1,32 +1,28 @@
 // src/pages/LoginPage.js
-import React, { useState } from 'react';
+import React from 'react';
 import { users } from '../data/mockData';
 
-// Componente da página de Login
+// Nova página de login com cards clicáveis
 function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState('');
-
-  // Função chamada ao tentar fazer login
-  const handleLogin = () => {
-    const user = users[email.toLowerCase()];
-    if (user) {
-      onLogin(user); // Se o usuário existe nos nossos dados, chama a função onLogin
-    } else {
-      alert('Usuário não encontrado. Tente ana@decifra.com ou carlos@decifra.com');
-    }
-  };
-
   return (
     <div className="container">
-      <h1>Bem-vindo ao Protótipo Decifra</h1>
-      <p>Para testar, use o e-mail <strong>ana@decifra.com</strong> para a visão do aluno ou <strong>carlos@decifra.com</strong> para a visão do professor.</p>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Digite seu e-mail"
-      />
-      <button onClick={handleLogin}>Entrar</button>
+      <h1>Protótipo Decifra</h1>
+      <h2>Selecione um perfil para iniciar:</h2>
+      <div className="login-card-container">
+        {/* Card para a Aluna Ana */}
+        <div className="login-card" onClick={() => onLogin(users['ana@decifra.com'])}>
+          <div className="avatar student-avatar">A</div>
+          <h3>Ana (Aluna)</h3>
+          <p>Visualize as atividades, seu progresso e receba ajuda do mentor.</p>
+        </div>
+
+        {/* Card para o Professor Carlos */}
+        <div className="login-card" onClick={() => onLogin(users['carlos@decifra.com'])}>
+          <div className="avatar teacher-avatar">C</div>
+          <h3>Carlos (Professor)</h3>
+          <p>Acesse o dashboard da turma e acompanhe o desenvolvimento dos alunos.</p>
+        </div>
+      </div>
     </div>
   );
 }

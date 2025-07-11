@@ -1,84 +1,286 @@
-/* src/App.css */
+/* src/App.css - Nova Identidade Visual "Decifrando o Código do Futuro" */
+
+/* 1. VARIÁVEIS DE COR E FONTES (Padrão Moderno) */
+:root {
+  --cor-primaria: #0A84FF; /* Azul Decifra */
+  --cor-destaque: #FFD60A; /* Amarelo Conquista */
+  --cor-sucesso: #34C759;
+  --cor-perigo: #FF453A;
+  --cor-texto-principal: #1D1D1F; /* Grafite */
+  --cor-texto-secundario: #86868B; /* Cinza Neutro */
+  --cor-fundo: #F2F2F7;
+  --cor-fundo-card: #FFFFFF;
+  --fonte-titulo: 'Nunito', sans-serif;
+  --fonte-corpo: 'Inter', sans-serif;
+}
+
+/* 2. ESTILOS GERAIS */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f4f7f6;
-  color: #333;
+  font-family: var(--fonte-corpo);
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto-principal);
   margin: 0;
-  padding: 20px;
+  padding: 15px;
 }
-
 .container {
-  max-width: 800px;
+  max-width: 960px;
   margin: 0 auto;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+h1, h2, h3, h4 {
+  font-family: var(--fonte-titulo);
+  font-weight: 800;
+  color: var(--cor-texto-principal);
+}
+p {
+  color: var(--cor-texto-secundario);
+  line-height: 1.6;
 }
 
-h1, h2 {
-  color: #005f73;
+/* 3. TELA DE LOGIN COM CARDS */
+.login-card-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-top: 40px;
 }
+.login-card {
+  background: var(--cor-fundo-card);
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  width: 100%;
+  max-width: 320px;
+  padding: 25px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid #E5E5E5;
+  transition: all 0.2s ease-in-out;
+}
+.login-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+.avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: bold;
+  color: white;
+  margin: 0 auto 15px;
+}
+.student-avatar { background-color: var(--cor-primaria); }
+.teacher-avatar { background-color: #34495E; } /* Tom de grafite escuro para o professor */
 
+/* 4. DASHBOARD DO ALUNO (PILARES) */
+.pillar-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 15px;
+}
+@media (min-width: 600px) {
+  .pillar-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 960px) {
+  .pillar-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.pillar-card {
+  background: var(--cor-fundo-card);
+  padding: 25px;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+  border: 2px solid transparent;
+}
+.pillar-card.disabled {
+  background-color: #E5E5E5;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pillar-card.clickable:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(10, 132, 255, 0.2);
+}
+.pillar-card.highlight {
+  border: 2px solid var(--cor-primaria);
+  box-shadow: 0 8px 25px rgba(10, 132, 255, 0.15);
+}
+.level-text { font-size: 20px; font-weight: bold; color: var(--cor-texto-principal); }
+
+/* 5. LISTA DE ATIVIDADES */
+.activity-list { list-style: none; padding: 0; }
+.activity-list li {
+  background-color: var(--cor-fundo-card);
+  margin-bottom: 12px;
+  padding: 15px 20px;
+  border-radius: 12px;
+  border: 1px solid #E5E5E5;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 16px;
+  font-weight: bold;
+}
+.activity-list li.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+.activity-list li.clickable:hover {
+  border-color: var(--cor-primaria);
+  background-color: #F9F9FF;
+}
+.activity-list li.disabled {
+  color: var(--cor-texto-secundario);
+  background-color: var(--cor-fundo);
+  cursor: not-allowed;
+}
+.activity-icon { font-size: 24px; color: var(--cor-sucesso); }
+.activity-list li.disabled .activity-icon { color: var(--cor-texto-secundario); }
+
+/* 6. BOTÕES E CAIXA DE TEXTO */
 button {
-  background-color: #0077b6;
+  background-color: var(--cor-primaria);
   color: white;
   border: none;
-  padding: 10px 15px;
-  border-radius: 5px;
+  padding: 12px 25px;
+  border-radius: 50px; /* Botões de pílula, bem modernos */
   cursor: pointer;
   font-size: 16px;
-  margin-top: 10px;
+  font-weight: 700;
+  font-family: var(--fonte-titulo);
+  transition: all 0.2s ease-in-out;
 }
-
 button:hover {
-  background-color: #023e8a;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);
 }
-
-input {
-  width: calc(100% - 20px);
-  padding: 10px;
-  margin-top: 10px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+button:active {
+  transform: scale(0.98);
 }
+.reset-button { background-color: var(--cor-perigo); }
+.back-button { background-color: var(--cor-texto-secundario); }
 
-.activity-list, .progress-list {
-  list-style: none;
-  padding: 0;
-}
-
-.activity-list li, .progress-list li {
-  background-color: #e9f5f9;
-  margin-bottom: 10px;
+textarea {
+  width: 100%;
   padding: 15px;
-  border-radius: 5px;
-  cursor: pointer;
+  box-sizing: border-box;
+  margin: 20px 0;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: var(--fonte-corpo);
+  resize: vertical;
+  min-height: 120px;
+}
+textarea:focus {
+  border-color: var(--cor-primaria);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
 }
 
-.activity-list li:hover {
-  background-color: #d4eff7;
+/* 7. DASHBOARD DO PROFESSOR */
+.teacher-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
 }
+.student-card {
+    background: var(--cor-fundo-card);
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    padding: 20px;
+    border: 1px solid #E5E5E5;
+}
+.student-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+.pillars-quadrant {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.quadrant {
+    background-color: var(--cor-fundo);
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+}
+.quadrant h4 { font-size: 13px; color: var(--cor-texto-secundario); margin: 0 0 8px 0; font-weight: 400; }
+.quadrant-data { font-size: 14px; font-weight: bold; }
+.level-icon { color: var(--cor-destaque); letter-spacing: 2px; }
+.level-icon.no-level { color: #D1D1D6; }
+.help-icon { color: var(--cor-primaria); }
 
-.hint-box {
-  background-color: #fff3cd;
-  border: 1px solid #ffeeba;
-  padding: 15px;
+/* 8. OUTROS COMPONENTES */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+}
+.hint-box, .collab-popup {
+  background-color: #FFFBEB;
+  border-left: 5px solid var(--cor-destaque);
+  border-radius: 8px;
+  padding: 20px;
   margin-top: 20px;
-  border-radius: 5px;
+}
+.collab-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 350px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 1px solid #E5E5E5;
+    z-index: 1000;
 }
 
-.collab-popup {
+/* Estilo para o fundo escurecido quando o popup está ativo */
+.feedback-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+/* Estilo para o Popup de Feedback */
+.feedback-popup {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 300px;
-  padding: 20px;
-  background: white;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-  border-radius: 10px;
+  width: 90%;
+  max-width: 450px;
+  padding: 30px;
+  background: var(--cor-fundo-card);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  border-radius: 20px;
   text-align: center;
   z-index: 1000;
+  border-top: 5px solid var(--cor-primaria);
+}
+
+.feedback-popup h2 {
+    margin-top: 0;
+    color: var(--cor-primaria);
+}
+
+.feedback-popup p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--cor-texto-principal);
+    margin-bottom: 25px;
 }
