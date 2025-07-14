@@ -2,7 +2,8 @@
 import React from 'react';
 import { activities } from '../data/mockData';
 import { getProgress } from '../services/progressService';
-import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react';
+import { ChevronRight, RotateCw, CheckCircle2 } from 'lucide-react';
+//import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react';
 
 function DecompositionPage({ level, onSelectActivity, onBack }) {
   const progress = getProgress();

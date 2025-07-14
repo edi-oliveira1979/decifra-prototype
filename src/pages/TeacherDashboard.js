@@ -6,18 +6,18 @@ import { levels as levelNames, pillars } from '../data/mockData';
 import { getTeacherDashboardData } from '../services/progressService';
 import { CheckCircle2, RotateCw, KeyRound } from 'lucide-react';
 
-const AutonomyIcon = ({ helps }) => {
-    if (helps === null || helps === undefined) return null;
-    let colorClass = 'grey';
-    if (helps === 0) colorClass = 'gold';
-    if (helps > 0 && helps <= 2) colorClass = 'blue';
-    return (
-        <span className={`autonomy-icon ${colorClass}`}>
-            <KeyRound size={16} />
-            {helps > 0 && <span>{helps}</span>}
-        </span>
-    );
-};
+//const AutonomyIcon = ({ helps }) => {
+//    if (helps === null || helps === undefined) return null;
+//    let colorClass = 'grey';
+//    if (helps === 0) colorClass = 'gold';
+//    if (helps > 0 && helps <= 2) colorClass = 'blue';
+//    return (
+//        <span className={`autonomy-icon ${colorClass}`}>
+//            <KeyRound size={16} />
+//            {helps > 0 && <span>{helps}</span>}
+//        </span>
+//    );
+//};
 
 const LevelSummary = ({ levelsData }) => {
     if (!levelsData || levelsData.length === 0) {

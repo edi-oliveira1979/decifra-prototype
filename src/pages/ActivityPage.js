@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { activities } from '../data/mockData';
 import { completeActivity } from '../services/progressService';
-import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react'; // Certifique-se de que os ícones necessários estão importados
+//import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react'; // Certifique-se de que os ícones necessários estão importados
 
 function ActivityPage({ activityId, onBack }) {
   const activity = activities.find(a => a.id === activityId);
