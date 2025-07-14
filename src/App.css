@@ -1,14 +1,14 @@
-/* src/App.css - Nova Identidade Visual "Decifrando o Código do Futuro" */
+/* src/App.css - Versão Definitiva e Corrigida */
 
-/* 1. VARIÁVEIS DE COR E FONTES (Padrão Moderno) */
+/* 1. VARIÁVEIS DE COR E FONTES */
 :root {
-  --cor-primaria: #0A84FF; /* Azul Decifra */
-  --cor-destaque: #FFD60A; /* Amarelo Conquista */
-  --cor-sucesso: #34C759;
+  --cor-primaria: #4A90E2;
+  --cor-destaque: #F5A623;
+  --cor-sucesso: #7ED321;
   --cor-perigo: #FF453A;
-  --cor-texto-principal: #1D1D1F; /* Grafite */
-  --cor-texto-secundario: #86868B; /* Cinza Neutro */
-  --cor-fundo: #F2F2F7;
+  --cor-texto-principal: #4A4A4A;
+  --cor-texto-secundario: #86868B;
+  --cor-fundo: #F7F8FC;
   --cor-fundo-card: #FFFFFF;
   --fonte-titulo: 'Nunito', sans-serif;
   --fonte-corpo: 'Inter', sans-serif;
@@ -21,22 +21,39 @@ body {
   color: var(--cor-texto-principal);
   margin: 0;
   padding: 15px;
+  box-sizing: border-box;
 }
 .container {
   max-width: 960px;
   margin: 0 auto;
+  padding: 20px;
 }
 h1, h2, h3, h4 {
   font-family: var(--fonte-titulo);
   font-weight: 800;
   color: var(--cor-texto-principal);
 }
-p {
-  color: var(--cor-texto-secundario);
-  line-height: 1.6;
+h1 { text-align: center; font-size: 2.2em; font-weight: 300; margin-bottom: 10px;}
+h2 { text-align: center; font-weight: 800; color: var(--cor-texto-secundario); margin-bottom: 40px; font-size: 1.2em; }
+p { color: var(--cor-texto-secundario); line-height: 1.6; }
+
+/* 3. HEADER SUPERIOR */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 20px;
+  background: var(--cor-fundo-card);
+  border-radius: 50px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+  margin: 0 auto 30px auto;
+  max-width: 960px;
+}
+.header p {
+    margin: 0;
 }
 
-/* 3. TELA DE LOGIN COM CARDS */
+/* 4. TELA DE LOGIN */
 .login-card-container {
   display: flex;
   flex-direction: column;
@@ -73,13 +90,13 @@ p {
   margin: 0 auto 15px;
 }
 .student-avatar { background-color: var(--cor-primaria); }
-.teacher-avatar { background-color: #34495E; } /* Tom de grafite escuro para o professor */
+.teacher-avatar { background-color: #34495E; }
 
-/* 4. DASHBOARD DO ALUNO (PILARES) */
+/* 5. DASHBOARD DO ALUNO */
 .pillar-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 15px;
+  gap: 25px;
 }
 @media (min-width: 600px) {
   .pillar-grid { grid-template-columns: repeat(2, 1fr); }
@@ -91,72 +108,104 @@ p {
   background: var(--cor-fundo-card);
   padding: 25px;
   border-radius: 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.07);
   text-align: center;
   transition: all 0.2s ease-in-out;
   border: 2px solid transparent;
 }
 .pillar-card.disabled {
-  background-color: #E5E5E5;
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+.pillar-card.clickable {
+  cursor: pointer;
 }
 .pillar-card.clickable:hover {
   transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(10, 132, 255, 0.2);
+  box-shadow: 0 10px 25px rgba(74, 144, 226, 0.2);
 }
 .pillar-card.highlight {
-  border: 2px solid var(--cor-primaria);
-  box-shadow: 0 8px 25px rgba(10, 132, 255, 0.15);
+  border-color: var(--cor-primaria);
 }
-.level-text { font-size: 20px; font-weight: bold; color: var(--cor-texto-principal); }
+.reactor-orb {
+  width: 80px;
+  height: 80px;
+  margin: 15px auto;
+  border-radius: 50%;
+  border: 4px solid var(--cor-fundo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  font-family: var(--fonte-titulo);
+  color: var(--cor-primaria);
+  background: linear-gradient(135deg, #eef5ff, #ffffff);
+}
+.reactor-orb.level-1 { border-color: var(--cor-destaque); }
+.reactor-orb.level-2, .reactor-orb.level-3, .reactor-orb.level-4, .reactor-orb.level-5 { border-color: var(--cor-sucesso); }
+.level-text { font-size: 16px; font-weight: bold; color: var(--cor-texto-principal); }
 
-/* 5. LISTA DE ATIVIDADES */
-.activity-list { list-style: none; padding: 0; }
-.activity-list li {
+/* 6. LISTAS DE NÍVEIS E ATIVIDADES */
+.level-list, .activity-list { list-style: none; padding: 0; }
+.level-card, .activity-list li {
   background-color: var(--cor-fundo-card);
-  margin-bottom: 12px;
-  padding: 15px 20px;
+  margin-bottom: 15px;
+  padding: 20px;
   border-radius: 12px;
   border: 1px solid #E5E5E5;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   display: flex;
   align-items: center;
   gap: 15px;
-  font-size: 16px;
-  font-weight: bold;
 }
-.activity-list li.clickable {
+.level-card.clickable, .activity-list li.clickable {
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-.activity-list li.clickable:hover {
+.level-card.clickable:hover, .activity-list li.clickable:hover {
   border-color: var(--cor-primaria);
-  background-color: #F9F9FF;
+  background-color: #F0F8FF;
+  transform: scale(1.02);
 }
-.activity-list li.disabled {
+.level-card.disabled, .activity-list li.disabled {
   color: var(--cor-texto-secundario);
-  background-color: var(--cor-fundo);
+  opacity: 0.6;
   cursor: not-allowed;
 }
-.activity-icon { font-size: 24px; color: var(--cor-sucesso); }
-.activity-list li.disabled .activity-icon { color: var(--cor-texto-secundario); }
+.level-card-stats {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  font-size: 14px;
+  color: var(--cor-texto-secundario);
+}
+.level-card-stats span { display: flex; align-items: center; gap: 8px; }
+.icon-success { color: var(--cor-sucesso); }
+.icon-warning { color: var(--cor-destaque); }
+.icon-pending { color: var(--cor-texto-secundario); }
+.autonomy-icon-small.gold { color: var(--cor-destaque); }
+.autonomy-icon-small.blue { color: var(--cor-primaria); }
+.autonomy-icon-small.grey { color: #BDBDBD; }
+.activity-icon { display: flex; align-items: center; }
+.activity-title { flex-grow: 1; font-size: 16px; font-weight: bold; }
 
-/* 6. BOTÕES E CAIXA DE TEXTO */
+/* 7. BOTÕES E CAIXA DE TEXTO */
 button {
-  background-color: var(--cor-primaria);
+  background: var(--cor-primaria);
   color: white;
   border: none;
-  padding: 12px 25px;
-  border-radius: 50px; /* Botões de pílula, bem modernos */
+  padding: 10px 22px;
+  border-radius: 50px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   font-family: var(--fonte-titulo);
   transition: all 0.2s ease-in-out;
 }
 button:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
 }
 button:active {
   transform: scale(0.98);
@@ -173,27 +222,28 @@ textarea {
   border-radius: 12px;
   font-size: 16px;
   font-family: var(--fonte-corpo);
+  line-height: 1.5;
   resize: vertical;
   min-height: 120px;
 }
 textarea:focus {
   border-color: var(--cor-primaria);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
 }
 
-/* 7. DASHBOARD DO PROFESSOR */
+/* 8. DASHBOARD DO PROFESSOR */
 .teacher-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 20px;
 }
 .student-card {
     background: var(--cor-fundo-card);
     border-radius: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.07);
     padding: 20px;
-    border: 1px solid #E5E5E5;
+    border: 1px solid #e9ecef;
 }
 .student-header {
     display: flex;
@@ -202,6 +252,7 @@ textarea:focus {
     padding-bottom: 15px;
     margin-bottom: 15px;
 }
+.student-header h3 { margin: 0; }
 .pillars-quadrant {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -214,71 +265,78 @@ textarea:focus {
     text-align: center;
 }
 .quadrant h4 { font-size: 13px; color: var(--cor-texto-secundario); margin: 0 0 8px 0; font-weight: 400; }
-.quadrant-data { font-size: 14px; font-weight: bold; }
-.level-icon { color: var(--cor-destaque); letter-spacing: 2px; }
-.level-icon.no-level { color: #D1D1D6; }
-.help-icon { color: var(--cor-primaria); }
-
-/* 8. OUTROS COMPONENTES */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 20px;
+.quadrant-data { font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.quadrant-data.main-level {
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
 }
-.hint-box, .collab-popup {
+.level-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: center;
+}
+.level-dot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: bold;
+}
+.autonomy-icon { display: flex; align-items: center; gap: 4px; }
+.autonomy-icon.gold { color: var(--cor-destaque); }
+.autonomy-icon.blue { color: var(--cor-primaria); }
+.autonomy-icon.grey { color: #BDBDBD; }
+
+/* 9. POPUPS E MODAIS */
+.hint-box {
   background-color: #FFFBEB;
   border-left: 5px solid var(--cor-destaque);
   border-radius: 8px;
   padding: 20px;
   margin-top: 20px;
 }
-.collab-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
-    max-width: 350px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    border: 1px solid #E5E5E5;
-    z-index: 1000;
-}
-
-/* Estilo para o fundo escurecido quando o popup está ativo */
-.feedback-popup-overlay {
+.feedback-popup-overlay, .collab-popup-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
     z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    box-sizing: border-box;
 }
-
-/* Estilo para o Popup de Feedback */
-.feedback-popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  max-width: 450px;
-  padding: 30px;
-  background: var(--cor-fundo-card);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  border-radius: 20px;
-  text-align: center;
-  z-index: 1000;
-  border-top: 5px solid var(--cor-primaria);
+.feedback-popup, .collab-popup {
+    width: 100%;
+    max-width: 450px;
+    padding: 30px;
+    background: var(--cor-fundo-card);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border-radius: 20px;
+    text-align: center;
+    z-index: 1000;
+    border-top: 5px solid var(--cor-primaria);
 }
-
-.feedback-popup h2 {
+.collab-popup {
+    border-top-color: var(--cor-destaque);
+}
+.feedback-popup h2, .collab-popup h2 {
     margin-top: 0;
     color: var(--cor-primaria);
 }
-
-.feedback-popup p {
+.collab-popup h2 {
+    color: #D69E00;
+}
+.feedback-popup p, .collab-popup p {
     font-size: 16px;
     line-height: 1.6;
     color: var(--cor-texto-principal);

@@ -2,41 +2,44 @@
 import React from 'react';
 import { activities } from '../data/mockData';
 import { getProgress } from '../services/progressService';
+import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react';
 
-function DecompositionPage({ onSelectActivity, onBack }) {
+function DecompositionPage({ level, onSelectActivity, onBack }) {
   const progress = getProgress();
-  const decompositionActivities = activities.filter(a => a.pillar === 'decomposicao');
+  // Filtra as atividades para mostrar apenas as do nível selecionado
+  const decompositionActivities = activities.filter(a => a.pillar === 'decomposicao' && a.level === level);
 
   return (
     <div className="container">
-      {/* Este botão usará o novo estilo que definiremos no CSS */}
-      <button onClick={onBack} className="back-button">&larr; Voltar para Pilares</button>
-      <h1>Pilar: Decomposição</h1>
+      <button onClick={onBack} className="back-button">&larr; Voltar para Níveis</button>
+      <h1>Decomposição - Nível {level}</h1>
       <p>Dividir problemas grandes em partes menores.</p>
       <ul className="activity-list">
         {decompositionActivities.map(activity => {
           const activityData = progress?.activityData?.[activity.id];
-          const isCompleted = activityData?.completed;
-
-          const previousActivity = activities.find(a => a.level === activity.level - 1 && a.pillar === 'decomposicao');
-          const previousActivityData = previousActivity ? progress?.activityData?.[previousActivity.id] : null;
-          const isLocked = previousActivity && !previousActivityData?.completed;
-
-          let statusIcon = '➡️';
-          if (isCompleted) statusIcon = '✔️';
-          if (isLocked) statusIcon = '🔒';
-
-          // A classe 'clickable' ou 'disabled' controlará o estilo do cursor
-          const listItemClass = isLocked ? 'disabled' : 'clickable';
+          const status = activityData?.status;
+          
+          // Lógica de desbloqueio foi simplificada pois agora estamos em uma página de nível
+          let statusIcon;
+          switch(status) {
+            case 'completo':
+              statusIcon = <CheckCircle2 size={24} className="icon-success" />;
+              break;
+            case 'parcial':
+              statusIcon = <RotateCw size={24} className="icon-warning" />;
+              break;
+            default:
+              statusIcon = <ChevronRight size={24} className="icon-pending" />;
+          }
 
           return (
             <li
               key={activity.id}
-              onClick={() => !isLocked && onSelectActivity(activity.id)}
-              className={listItemClass}
+              onClick={() => onSelectActivity(activity.id)}
+              className={'clickable'} // Todas as atividades na página de nível são clicáveis
             >
               <span className="activity-icon">{statusIcon}</span>
-              <span className="activity-title">{activity.title} (Nível {activity.level})</span>
+              <span className="activity-title">{activity.title}</span>
             </li>
           );
         })}

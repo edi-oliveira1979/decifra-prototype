@@ -1,87 +1,136 @@
 // src/pages/ActivityPage.js
-
 import React, { useState } from 'react';
 import { activities } from '../data/mockData';
 import { completeActivity } from '../services/progressService';
 
 function ActivityPage({ activityId, onBack }) {
-  // Encontra a atividade correta com base no ID recebido
   const activity = activities.find(a => a.id === activityId);
   
-  // --- Estados do Componente ---
-
-  // Guarda a resposta que o aluno está digitando
   const [answer, setAnswer] = useState('');
-  // Guarda o nível de ajuda que o aluno já solicitou (0, 1, 2, 3)
   const [helpLevel, setHelpLevel] = useState(0);
-  // Controla a visibilidade do popup de colaboração
   const [showCollabPopup, setShowCollabPopup] = useState(false);
-  // NOVO ESTADO: Guarda a mensagem de feedback da IA para exibir no popup
   const [feedback, setFeedback] = useState(null);
+  const [feedbackStatus, setFeedbackStatus] = useState('');
 
-  // --- Funções de Lógica ---
-
-  // Função para normalizar texto (facilita a comparação de palavras-chave)
   const normalizeText = (text) => {
     if (!text) return '';
     return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
 
-  // NOVA FUNÇÃO: Simula a IA analisando a resposta do aluno
-  const handleCritique = () => {
-    const studentAnswer = normalizeText(answer);
-    const { keywords, feedbacks } = activity.analiseResposta;
+  // --- MOTOR DE ANÁLISE SEMÂNTICA v4.0 ---
+  const analyzeAndSetFeedback = (studentAnswerText) => {
+    const studentAnswer = normalizeText(studentAnswerText);
+    const { conceptGroups, minRequiredConcepts, feedbacks, validation, socratic_hints } = activity.analiseResposta;
     
-    let matchCount = 0;
-    // Conta quantas palavras-chave foram encontradas na resposta
-    keywords.forEach(keyword => {
-      if (studentAnswer.includes(keyword)) {
-        matchCount++;
+    // 1. Análise de Conceitos
+    const foundConcepts = new Set();
+    const foundConceptsInOrder = [];
+    const duplicateConcepts = new Set();
+    
+    conceptGroups.forEach(group => {
+      if (group.keywords.some(keyword => studentAnswer.includes(normalizeText(keyword)))) {
+        if (foundConcepts.has(group.name)) {
+          duplicateConcepts.add(group.name);
+        } else {
+          foundConcepts.add(group.name);
+          // A ordem só é relevante para a validação de sequência
+          if (validation?.type === 'sequence') {
+            foundConceptsInOrder.push(group.name);
+          }
+        }
       }
     });
+    
+    let feedbackMessage = '';
+    let currentStatus = 'baixo';
+    let isValid = foundConcepts.size >= minRequiredConcepts;
+    let validationError = '';
 
-    const matchPercentage = keywords.length > 0 ? (matchCount / keywords.length) : 0;
-    let feedbackMessage;
-
-    // Define qual feedback usar com base na porcentagem de acertos
-    if (matchPercentage > 0.6) {
-      feedbackMessage = feedbacks.completo;
-    } else if (matchPercentage > 0.3) {
-      feedbackMessage = feedbacks.parcial;
-    } else {
-      feedbackMessage = feedbacks.baixo;
+    // 2. Validações Específicas
+    if (validation) {
+      if (validation.type === 'sum') {
+        const numbers = studentAnswerText.match(/-?\d+/g)?.map(Number) || [];
+        const totalSum = numbers.reduce((sum, num) => sum + num, 0);
+        if (isValid && totalSum > validation.target) {
+          validationError = `Suas categorias estão ótimas! Mas notei que a soma dos valores (R$ ${totalSum}) ultrapassou o orçamento de R$ ${validation.target}. Que tal ajustar os custos?`;
+          isValid = false;
+        }
+      } else if (validation.type === 'sequence') {
+        let lastFoundIndex = -1;
+        let isSequenceCorrect = true;
+        for (const concept of foundConceptsInOrder) {
+          const currentIndex = validation.orderedConcepts.indexOf(concept);
+          if (currentIndex === -1) continue;
+          if (currentIndex < lastFoundIndex) { isSequenceCorrect = false; break; }
+          lastFoundIndex = currentIndex;
+        }
+        if (!isSequenceCorrect) {
+          validationError = "Os passos que você listou são todos importantes, mas a ordem parece um pouco trocada. Lembre-se, o que precisa acontecer primeiro para que o próximo passo seja possível?";
+          isValid = false;
+        }
+      }
     }
 
-    // Define a mensagem de feedback no estado, o que fará o popup aparecer
+    // 3. Construção do Feedback Dinâmico e Final
+    if (isValid && !validationError) {
+      currentStatus = 'completo';
+      feedbackMessage = feedbacks.completo;
+    } else {
+      currentStatus = 'parcial';
+      if (validationError) {
+        feedbackMessage = validationError;
+      } else {
+        let praise = '';
+        if (foundConcepts.size > 0) {
+          praise = `Excelente! Você já identificou conceitos importantes como **${Array.from(foundConcepts).join(', ')}**. `;
+        }
+        
+        let hint = '';
+        const missingConcept = (validation?.type === 'sequence' ? validation.orderedConcepts : conceptGroups).find(c => !foundConcepts.has(c.name || c));
+
+        if (missingConcept) {
+          const conceptName = missingConcept.name || missingConcept;
+          hint = socratic_hints[conceptName] || `Para chegar aos ${minRequiredConcepts} conceitos, que outra área importante ainda não foi coberta?`;
+        } else if (duplicateConcepts.size > 0) {
+          hint = `Notei que você usou termos diferentes para o mesmo conceito de **'${Array.from(duplicateConcepts).join(' e ')}'**. Que tal substituir um deles por uma ideia totalmente nova?`;
+        } else {
+          hint = "Sua análise está quase perfeita, continue refinando!";
+        }
+        feedbackMessage = praise + hint;
+      }
+    }
+
     setFeedback(feedbackMessage);
-    // Salva o progresso completo, incluindo a resposta e o feedback dado
-    completeActivity(activity.id, helpLevel, answer, feedbackMessage);
+    setFeedbackStatus(currentStatus);
+    completeActivity(activity.id, helpLevel, studentAnswerText, feedbackMessage, currentStatus);
   };
 
-  // Função chamada ao clicar no botão "Enviar Resposta"
+  
   const handleSubmit = () => {
     if (!answer) {
         alert('Por favor, digite uma resposta.');
         return;
     }
-    // Em vez de só concluir, agora chamamos nossa função de crítica
-    handleCritique();
+    analyzeAndSetFeedback(answer);
   };
-
-  // Função para o botão "Preciso de ajuda", com lógica em camadas
+  
+  const handleCloseFeedback = () => {
+    setFeedback(null);
+    if (feedbackStatus === 'completo') {
+      onBack();
+    }
+  };
+  
   const handleHelpClick = () => {
     const nextHelpLevel = helpLevel + 1;
     setHelpLevel(nextHelpLevel);
-
-    // Se todas as 3 dicas já foram exibidas, sugere a colaboração
     if (nextHelpLevel > 3) {
       setShowCollabPopup(true);
     }
   };
-
-  // Função para renderizar o box de dicas de forma progressiva
+  
   const renderHelpContent = () => {
-    if (helpLevel === 0) return null;
+    if (helpLevel === 0 || !activity?.ajuda) return null;
 
     return (
       <div className="hint-box">
@@ -92,19 +141,19 @@ function ActivityPage({ activityId, onBack }) {
     );
   };
 
-  // --- Renderização do Componente (O que aparece na tela) ---
+  if (!activity) {
+    return <div className="container"><h1>Atividade não encontrada.</h1><button onClick={onBack} className="back-button">&larr; Voltar</button></div>;
+  }
 
+  // --- Renderização do Componente ---
   return (
     <div className="container">
-      {/* O NOVO POPUP DE FEEDBACK DA IA */}
-      {/* Ele só aparece se o estado 'feedback' não for nulo */}
       {feedback && (
         <div className="feedback-popup-overlay">
           <div className="feedback-popup">
             <h2>Feedback do Mentor</h2>
-            <p>{feedback}</p>
-            {/* O botão "Entendi" agora te leva de volta para a lista de atividades */}
-            <button onClick={onBack}>Entendi, continuar!</button>
+            <p dangerouslySetInnerHTML={{ __html: feedback }}></p>
+            <button onClick={handleCloseFeedback}>Entendi, continuar!</button>
           </div>
         </div>
       )}
@@ -125,12 +174,13 @@ function ActivityPage({ activityId, onBack }) {
 
       {renderHelpContent()}
 
-      {/* O popup de colaboração continua funcionando como antes */}
       {showCollabPopup && (
-        <div className="collab-popup">
-          <h2>Peça uma Perspectiva!</h2>
-          <p>Você já usou todas as dicas. Às vezes, uma segunda opinião ajuda a ver o problema de um novo ângulo. Que tal discutir sua ideia com um colega antes de responder?</p>
-          <button onClick={() => setShowCollabPopup(false)}>Entendi!</button>
+        <div className="collab-popup-overlay">
+            <div className="collab-popup">
+            <h2>Peça uma Perspectiva!</h2>
+            <p>Você já usou todas as dicas. Às vezes, uma segunda opinião ajuda a ver o problema de um novo ângulo. Que tal discutir sua ideia com um colega antes de responder?</p>
+            <button onClick={() => setShowCollabPopup(false)}>Entendi!</button>
+            </div>
         </div>
       )}
     </div>

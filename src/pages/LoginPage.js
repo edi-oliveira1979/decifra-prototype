@@ -1,8 +1,8 @@
 // src/pages/LoginPage.js
+
 import React from 'react';
 import { users } from '../data/mockData';
 
-// Nova página de login com cards clicáveis
 function LoginPage({ onLogin }) {
   return (
     <div className="container">
@@ -12,7 +12,7 @@ function LoginPage({ onLogin }) {
         {/* Card para a Aluna Ana */}
         <div className="login-card" onClick={() => onLogin(users['ana@decifra.com'])}>
           <div className="avatar student-avatar">A</div>
-          <h3>Ana (Aluna)</h3>
+          <h3>Ana (Estudante)</h3>
           <p>Visualize as atividades, seu progresso e receba ajuda do mentor.</p>
         </div>
 

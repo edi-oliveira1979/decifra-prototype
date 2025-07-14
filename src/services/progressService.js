@@ -1,4 +1,7 @@
 // src/services/progressService.js
+
+// CORREÇÃO: Removemos 'levels' desta linha, pois não é usado neste arquivo.
+// Ele é usado nos componentes de UI, mas não aqui no serviço.
 import { pillars, activities, mockTeacherData, users } from '../data/mockData';
 
 const PROGRESS_KEY = 'decifra_progress';
@@ -11,18 +14,14 @@ export const initializeProgress = () => {
 };
 
 export const getProgress = () => {
-  const progressString = localStorage.getItem(PROGRESS_KEY);
-  if (!progressString) {
-    initializeProgress();
-    return JSON.parse(localStorage.getItem(PROGRESS_KEY));
-  }
-  return JSON.parse(progressString);
+  initializeProgress();
+  return JSON.parse(localStorage.getItem(PROGRESS_KEY));
 };
 
-export const completeActivity = (activityId, helpLevelUsed, studentAnswer, feedbackGiven) => {
+export const completeActivity = (activityId, helpLevelUsed, studentAnswer, feedbackGiven, feedbackStatus) => {
   const progress = getProgress();
   progress.activityData[activityId] = {
-    completed: true,
+    status: feedbackStatus,
     helpLevel: helpLevelUsed,
     answer: studentAnswer,
     feedback: feedbackGiven,
@@ -43,9 +42,10 @@ export const getPillarLevels = () => {
 
   pillars.forEach(pillar => {
     const pillarActivities = activities.filter(a => a.pillar === pillar.id);
-    const completedPillarActivities = pillarActivities.filter(
-      a => progress?.activityData?.[a.id]?.completed
-    );
+    const completedPillarActivities = pillarActivities.filter(a => {
+        const status = progress?.activityData?.[a.id]?.status;
+        return status === 'completo' || status === 'parcial';
+    });
 
     let maxLevel = 0;
     if (completedPillarActivities.length > 0) {
@@ -56,36 +56,86 @@ export const getPillarLevels = () => {
   return pillarLevels;
 };
 
+export const getLevelsDataForPillar = (pillarId) => {
+  const progressData = getProgress().activityData;
+  const levelsData = {};
+
+  const activitiesInPillar = activities.filter(a => a.pillar === pillarId);
+  if (activitiesInPillar.length === 0) return [];
+
+  const maxLevelInPillar = Math.max(...activitiesInPillar.map(a => a.level), 0);
+
+  for (let levelNum = 1; levelNum <= maxLevelInPillar; levelNum++) {
+    const activitiesInLevel = activitiesInPillar.filter(a => a.level === levelNum);
+    if (activitiesInLevel.length === 0) continue;
+
+    const completedInLevel = activitiesInLevel.filter(a => progressData[a.id]?.status === 'completo' || progressData[a.id]?.status === 'parcial');
+    
+    let bestPerformanceStatus = 'nao_iniciado';
+    let bestAutonomy = null;
+
+    if (completedInLevel.length > 0) {
+      const hasCompletedPerfectly = completedInLevel.some(a => progressData[a.id]?.status === 'completo');
+      bestPerformanceStatus = hasCompletedPerfectly ? 'completo' : 'parcial';
+      
+      const bestActivity = completedInLevel.find(a => progressData[a.id]?.status === 'completo') || completedInLevel[0];
+      if (bestActivity && progressData[bestActivity.id]) {
+        bestAutonomy = progressData[bestActivity.id].helpLevel;
+      }
+    }
+    
+    levelsData[levelNum] = {
+      levelNumber: levelNum,
+      totalActivities: activitiesInLevel.length,
+      completedCount: completedInLevel.length,
+      bestPerformanceStatus,
+      bestAutonomy,
+    };
+  }
+  return Object.values(levelsData);
+};
 
 export const getTeacherDashboardData = () => {
-  const anaProgressData = getProgress();
-  const anaPillarLevels = getPillarLevels(); 
+  // CORREÇÃO: Removemos a linha 'const anaProgressData = ...' que não estava sendo utilizada.
+  // A lógica agora é mais direta e clara.
 
-  const anaDashboardData = {
+  // Pega os dados reais da Ana (Estudante)
+  const anaPillarLevels = getPillarLevels();
+  const anaData = {
     studentId: users['ana@decifra.com'].id,
-    studentName: users['ana@decifra.com'].name,
-    pillars: {},
+    studentName: 'Ana', // Usamos o nome diretamente para clareza
+    pillars: {}
   };
-
   pillars.forEach(pillar => {
-    const lastActivityCompleted = activities
-      .filter(a => a.pillar === pillar.id && anaProgressData.activityData[a.id]?.completed)
-      .sort((a, b) => b.level - a.level)[0]; // Pega a atividade de maior nível
-
-    anaDashboardData.pillars[pillar.id] = {
-      level: anaPillarLevels[pillar.id] || 0,
-      helps: lastActivityCompleted ? anaProgressData.activityData[lastActivityCompleted.id]?.helpLevel : 0,
+    anaData.pillars[pillar.id] = {
+      overallLevel: anaPillarLevels[pillar.id] || 0,
+      levels: getLevelsDataForPillar(pillar.id),
     };
   });
 
-  const otherStudentsData = mockTeacherData.map(student => ({
-      studentId: Math.random(),
-      studentName: student.studentName,
-      pillars: Object.keys(student.progress).reduce((acc, pillarKey) => {
-          acc[pillarKey] = { level: student.progress[pillarKey], helps: Math.floor(Math.random() * 3) };
-          return acc;
-      }, {})
-  }));
+  // Processa os dados FÍCTICIOS dos outros alunos
+  const otherStudentsData = mockTeacherData.map(student => {
+    const studentData = {
+        studentId: student.studentName,
+        studentName: student.studentName,
+        pillars: {}
+    };
+    pillars.forEach(pillar => {
+      const overallLevel = student.progress[pillar.id] || 0;
+      studentData.pillars[pillar.id] = {
+        overallLevel: overallLevel,
+        levels: Array.from({length: overallLevel}, (_, i) => ({
+          levelNumber: i + 1,
+          totalActivities: 1,
+          completedCount: 1,
+          bestPerformanceStatus: 'completo',
+          bestAutonomy: Math.floor(Math.random() * 2)
+        }))
+      };
+    });
+    return studentData;
+  });
 
-  return [anaDashboardData, ...otherStudentsData];
+  // Combina os dados reais da Ana com os fictícios e retorna
+  return [anaData, ...otherStudentsData];
 };
