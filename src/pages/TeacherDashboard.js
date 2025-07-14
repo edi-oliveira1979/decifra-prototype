@@ -4,7 +4,8 @@ import React from 'react';
 // CORREÇÃO: Importamos 'levels' e 'pillars' da sua fonte original, o mockData.js
 import { levels as levelNames, pillars } from '../data/mockData'; 
 import { getTeacherDashboardData } from '../services/progressService';
-import { CheckCircle2, RotateCw, KeyRound } from 'lucide-react';
+import { CheckCircle2, RotateCw } from 'lucide-react';
+//import { CheckCircle2, RotateCw, KeyRound } from 'lucide-react';
 
 //const AutonomyIcon = ({ helps }) => {
 //    if (helps === null || helps === undefined) return null;
