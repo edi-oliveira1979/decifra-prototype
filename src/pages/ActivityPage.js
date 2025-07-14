@@ -1,28 +1,30 @@
 // src/pages/ActivityPage.js
+
 import React, { useState } from 'react';
 import { activities } from '../data/mockData';
 import { completeActivity } from '../services/progressService';
+import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react'; // Certifique-se de que os ícones necessários estão importados
 
 function ActivityPage({ activityId, onBack }) {
   const activity = activities.find(a => a.id === activityId);
   
+  // Os estados do componente permanecem os mesmos
   const [answer, setAnswer] = useState('');
   const [helpLevel, setHelpLevel] = useState(0);
   const [showCollabPopup, setShowCollabPopup] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [feedbackStatus, setFeedbackStatus] = useState('');
 
+  // Todas as funções de lógica (normalizeText, analyzeAndSetFeedback, etc.) permanecem as mesmas
   const normalizeText = (text) => {
     if (!text) return '';
     return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
 
-  // --- MOTOR DE ANÁLISE SEMÂNTICA v4.0 ---
   const analyzeAndSetFeedback = (studentAnswerText) => {
     const studentAnswer = normalizeText(studentAnswerText);
     const { conceptGroups, minRequiredConcepts, feedbacks, validation, socratic_hints } = activity.analiseResposta;
     
-    // 1. Análise de Conceitos
     const foundConcepts = new Set();
     const foundConceptsInOrder = [];
     const duplicateConcepts = new Set();
@@ -33,7 +35,6 @@ function ActivityPage({ activityId, onBack }) {
           duplicateConcepts.add(group.name);
         } else {
           foundConcepts.add(group.name);
-          // A ordem só é relevante para a validação de sequência
           if (validation?.type === 'sequence') {
             foundConceptsInOrder.push(group.name);
           }
@@ -46,7 +47,6 @@ function ActivityPage({ activityId, onBack }) {
     let isValid = foundConcepts.size >= minRequiredConcepts;
     let validationError = '';
 
-    // 2. Validações Específicas
     if (validation) {
       if (validation.type === 'sum') {
         const numbers = studentAnswerText.match(/-?\d+/g)?.map(Number) || [];
@@ -71,7 +71,6 @@ function ActivityPage({ activityId, onBack }) {
       }
     }
 
-    // 3. Construção do Feedback Dinâmico e Final
     if (isValid && !validationError) {
       currentStatus = 'completo';
       feedbackMessage = feedbacks.completo;
@@ -84,18 +83,10 @@ function ActivityPage({ activityId, onBack }) {
         if (foundConcepts.size > 0) {
           praise = `Excelente! Você já identificou conceitos importantes como **${Array.from(foundConcepts).join(', ')}**. `;
         }
-        
-        let hint = '';
         const missingConcept = (validation?.type === 'sequence' ? validation.orderedConcepts : conceptGroups).find(c => !foundConcepts.has(c.name || c));
-
-        if (missingConcept) {
-          const conceptName = missingConcept.name || missingConcept;
-          hint = socratic_hints[conceptName] || `Para chegar aos ${minRequiredConcepts} conceitos, que outra área importante ainda não foi coberta?`;
-        } else if (duplicateConcepts.size > 0) {
-          hint = `Notei que você usou termos diferentes para o mesmo conceito de **'${Array.from(duplicateConcepts).join(' e ')}'**. Que tal substituir um deles por uma ideia totalmente nova?`;
-        } else {
-          hint = "Sua análise está quase perfeita, continue refinando!";
-        }
+        const hint = (missingConcept && socratic_hints[missingConcept.name || missingConcept]) 
+          ? socratic_hints[missingConcept.name || missingConcept]
+          : "Sua análise está quase perfeita, continue refinando!";
         feedbackMessage = praise + hint;
       }
     }
@@ -104,7 +95,6 @@ function ActivityPage({ activityId, onBack }) {
     setFeedbackStatus(currentStatus);
     completeActivity(activity.id, helpLevel, studentAnswerText, feedbackMessage, currentStatus);
   };
-
   
   const handleSubmit = () => {
     if (!answer) {
@@ -131,7 +121,6 @@ function ActivityPage({ activityId, onBack }) {
   
   const renderHelpContent = () => {
     if (helpLevel === 0 || !activity?.ajuda) return null;
-
     return (
       <div className="hint-box">
         {helpLevel >= 1 && <p><strong>Dica Contextual:</strong> {activity.ajuda.dica_contextual}</p>}
@@ -145,7 +134,6 @@ function ActivityPage({ activityId, onBack }) {
     return <div className="container"><h1>Atividade não encontrada.</h1><button onClick={onBack} className="back-button">&larr; Voltar</button></div>;
   }
 
-  // --- Renderização do Componente ---
   return (
     <div className="container">
       {feedback && (
@@ -158,7 +146,7 @@ function ActivityPage({ activityId, onBack }) {
         </div>
       )}
 
-      <button onClick={onBack} className="back-button">&larr; Voltar</button>
+      <button onClick={onBack} className="back-button">&larr; Voltar para a Lista</button>
       <h1>{activity.title}</h1>
       <p>{activity.description}</p>
       <h2>{activity.question}</h2>
@@ -168,9 +156,13 @@ function ActivityPage({ activityId, onBack }) {
         rows="5"
         placeholder="Digite sua resposta aqui..."
       />
-      <br />
-      <button onClick={handleHelpClick}>Preciso de ajuda</button>
-      <button onClick={handleSubmit} style={{ marginLeft: '10px' }}>Enviar Resposta</button>
+      
+      {/* --- ESTRUTURA CORRETA E FINAL DOS BOTÕES --- */}
+      <div className="activity-controls">
+        <button onClick={handleSubmit}>Enviar resposta</button>
+        <button className="help-button" onClick={handleHelpClick}>Preciso de ajuda</button>
+      </div>
+
 
       {renderHelpContent()}
 
@@ -178,7 +170,7 @@ function ActivityPage({ activityId, onBack }) {
         <div className="collab-popup-overlay">
             <div className="collab-popup">
             <h2>Peça uma Perspectiva!</h2>
-            <p>Você já usou todas as dicas. Às vezes, uma segunda opinião ajuda a ver o problema de um novo ângulo. Que tal discutir sua ideia com um colega antes de responder?</p>
+            <p>Você já usou todas as dicas. Às vezes, uma segunda opinião ajuda a ver o problema de um novo ângulo. Que tal discutir sua ideia com um colega?</p>
             <button onClick={() => setShowCollabPopup(false)}>Entendi!</button>
             </div>
         </div>

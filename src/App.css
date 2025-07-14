@@ -1,4 +1,4 @@
-/* src/App.css - Versão Definitiva e Corrigida */
+/* src/App.css - Versão Final com Layout dos Botões Corrigido */
 
 /* 1. VARIÁVEIS DE COR E FONTES */
 :root {
@@ -14,28 +14,43 @@
   --fonte-corpo: 'Inter', sans-serif;
 }
 
-/* 2. ESTILOS GERAIS */
+/* 2. ESTILOS GERAIS - MOBILE-FIRST */
+html, body {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box; 
+}
+
 body {
   font-family: var(--fonte-corpo);
   background-color: var(--cor-fundo);
   color: var(--cor-texto-principal);
-  margin: 0;
-  padding: 15px;
-  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
 .container {
   max-width: 960px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 15px;
 }
+
 h1, h2, h3, h4 {
   font-family: var(--fonte-titulo);
   font-weight: 800;
   color: var(--cor-texto-principal);
+  word-wrap: break-word;
 }
-h1 { text-align: center; font-size: 2.2em; font-weight: 300; margin-bottom: 10px;}
-h2 { text-align: center; font-weight: 800; color: var(--cor-texto-secundario); margin-bottom: 40px; font-size: 1.2em; }
-p { color: var(--cor-texto-secundario); line-height: 1.6; }
+h1 { text-align: center; font-size: 1.8em; font-weight: 800; margin: 20px 0 10px 0;}
+@media (min-width: 600px) {
+  h1 { font-size: 2.2em; }
+}
+h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); margin-top: 0; margin-bottom: 30px; font-size: 1.1em; }
 
 /* 3. HEADER SUPERIOR */
 .header {
@@ -46,14 +61,12 @@ p { color: var(--cor-texto-secundario); line-height: 1.6; }
   background: var(--cor-fundo-card);
   border-radius: 50px;
   box-shadow: 0 5px 20px rgba(0,0,0,0.07);
-  margin: 0 auto 30px auto;
+  margin: 20px auto 30px auto;
   max-width: 960px;
 }
-.header p {
-    margin: 0;
-}
+.header p { font-size: 14px; margin: 0; }
 
-/* 4. TELA DE LOGIN */
+/* 4. TELA DE LOGIN COM CARDS */
 .login-card-container {
   display: flex;
   flex-direction: column;
@@ -66,7 +79,7 @@ p { color: var(--cor-texto-secundario); line-height: 1.6; }
   border-radius: 20px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   width: 100%;
-  max-width: 320px;
+  max-width: 350px;
   padding: 25px;
   text-align: center;
   cursor: pointer;
@@ -96,9 +109,9 @@ p { color: var(--cor-texto-secundario); line-height: 1.6; }
 .pillar-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 25px;
+  gap: 20px;
 }
-@media (min-width: 600px) {
+@media (min-width: 500px) {
   .pillar-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (min-width: 960px) {
@@ -106,52 +119,27 @@ p { color: var(--cor-texto-secundario); line-height: 1.6; }
 }
 .pillar-card {
   background: var(--cor-fundo-card);
-  padding: 25px;
+  padding: 20px;
   border-radius: 20px;
   box-shadow: 0 5px 20px rgba(0,0,0,0.07);
   text-align: center;
   transition: all 0.2s ease-in-out;
   border: 2px solid transparent;
 }
-.pillar-card.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.pillar-card.clickable {
-  cursor: pointer;
-}
+.pillar-card.clickable { cursor: pointer; }
 .pillar-card.clickable:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 25px rgba(74, 144, 226, 0.2);
 }
-.pillar-card.highlight {
-  border-color: var(--cor-primaria);
-}
-.reactor-orb {
-  width: 80px;
-  height: 80px;
-  margin: 15px auto;
-  border-radius: 50%;
-  border: 4px solid var(--cor-fundo);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 800;
-  font-family: var(--fonte-titulo);
-  color: var(--cor-primaria);
-  background: linear-gradient(135deg, #eef5ff, #ffffff);
-}
-.reactor-orb.level-1 { border-color: var(--cor-destaque); }
-.reactor-orb.level-2, .reactor-orb.level-3, .reactor-orb.level-4, .reactor-orb.level-5 { border-color: var(--cor-sucesso); }
-.level-text { font-size: 16px; font-weight: bold; color: var(--cor-texto-principal); }
+.pillar-card.disabled { opacity: 0.6; cursor: not-allowed; }
+.pillar-card.highlight { border-color: var(--cor-primaria); }
 
 /* 6. LISTAS DE NÍVEIS E ATIVIDADES */
 .level-list, .activity-list { list-style: none; padding: 0; }
 .level-card, .activity-list li {
   background-color: var(--cor-fundo-card);
   margin-bottom: 15px;
-  padding: 20px;
+  padding: 15px;
   border-radius: 12px;
   border: 1px solid #E5E5E5;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
@@ -168,29 +156,91 @@ p { color: var(--cor-texto-secundario); line-height: 1.6; }
   background-color: #F0F8FF;
   transform: scale(1.02);
 }
-.level-card.disabled, .activity-list li.disabled {
-  color: var(--cor-texto-secundario);
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.level-card h3 { font-size: 1.1em; }
 .level-card-stats {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   width: 100%;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--cor-texto-secundario);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 .level-card-stats span { display: flex; align-items: center; gap: 8px; }
+
+/* 7. DASHBOARD DO PROFESSOR */
+.teacher-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+@media (min-width: 768px) {
+  .teacher-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+}
+.student-card {
+    background: var(--cor-fundo-card);
+    border-radius: 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+    padding: 20px;
+    border: 1px solid #e9ecef;
+}
+.student-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+.student-header h3 { margin: 0; font-size: 1.2em; }
+.pillars-quadrant {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.quadrant {
+    background-color: var(--cor-fundo);
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+}
+.quadrant h4 { font-size: 12px; color: var(--cor-texto-secundario); margin: 0 0 8px 0; font-weight: 400; }
+.quadrant-data { font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.quadrant-data.main-level {
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+.level-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: center;
+}
+.level-dot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: bold;
+}
 .icon-success { color: var(--cor-sucesso); }
 .icon-warning { color: var(--cor-destaque); }
 .icon-pending { color: var(--cor-texto-secundario); }
-.autonomy-icon-small.gold { color: var(--cor-destaque); }
-.autonomy-icon-small.blue { color: var(--cor-primaria); }
-.autonomy-icon-small.grey { color: #BDBDBD; }
+.autonomy-icon, .autonomy-icon-small { display: flex; align-items: center; gap: 4px; }
+.autonomy-icon.gold, .autonomy-icon-small.gold { color: var(--cor-destaque); }
+.autonomy-icon.blue, .autonomy-icon-small.blue { color: var(--cor-primaria); }
+.autonomy-icon.grey, .autonomy-icon-small.grey { color: #BDBDBD; }
+.activity-list li.disabled .activity-icon { color: var(--cor-texto-secundario); }
 .activity-icon { display: flex; align-items: center; }
 .activity-title { flex-grow: 1; font-size: 16px; font-weight: bold; }
 
-/* 7. BOTÕES E CAIXA DE TEXTO */
+/* 8. BOTÕES E FORMULÁRIOS */
 button {
   background: var(--cor-primaria);
   color: white;
@@ -232,66 +282,32 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
 }
 
-/* 8. DASHBOARD DO PROFESSOR */
-.teacher-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
+/* --- LAYOUT DOS BOTÕES DA PÁGINA DE ATIVIDADE (REFINADO) --- */
+.activity-controls {
+  display: flex;
+  flex-direction: row; 
+  justify-content: flex-end; 
+  gap: 15px; 
+  margin-top: 20px;
 }
-.student-card {
-    background: var(--cor-fundo-card);
-    border-radius: 20px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.07);
-    padding: 20px;
-    border: 1px solid #e9ecef;
+.help-button {
+  background: var(--cor-texto-secundario);
 }
-.student-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding-bottom: 15px;
-    margin-bottom: 15px;
+.help-button:hover {
+  background: #5a6268;
 }
-.student-header h3 { margin: 0; }
-.pillars-quadrant {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+
+/* Para telas de celular, empilha e inverte a ordem visual */
+@media (max-width: 600px) {
+  .activity-controls {
+    flex-direction: column; 
     gap: 10px;
+  }
+  .activity-controls button {
+    width: 100%; 
+    margin: 0; 
+  }
 }
-.quadrant {
-    background-color: var(--cor-fundo);
-    border-radius: 12px;
-    padding: 15px;
-    text-align: center;
-}
-.quadrant h4 { font-size: 13px; color: var(--cor-texto-secundario); margin: 0 0 8px 0; font-weight: 400; }
-.quadrant-data { font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.quadrant-data.main-level {
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 10px;
-}
-.level-summary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-    justify-content: center;
-}
-.level-dot {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background-color: #e9ecef;
-    padding: 4px 8px;
-    border-radius: 50px;
-    font-size: 12px;
-    font-weight: bold;
-}
-.autonomy-icon { display: flex; align-items: center; gap: 4px; }
-.autonomy-icon.gold { color: var(--cor-destaque); }
-.autonomy-icon.blue { color: var(--cor-primaria); }
-.autonomy-icon.grey { color: #BDBDBD; }
 
 /* 9. POPUPS E MODAIS */
 .hint-box {
