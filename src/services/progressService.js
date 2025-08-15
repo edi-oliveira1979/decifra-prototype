@@ -1,141 +1,190 @@
 // src/services/progressService.js
 
-// CORREÇÃO: Removemos 'levels' desta linha, pois não é usado neste arquivo.
-// Ele é usado nos componentes de UI, mas não aqui no serviço.
-import { pillars, activities, mockTeacherData, users } from '../data/mockData';
+let AUTH_TOKEN = null;
 
-const PROGRESS_KEY = 'decifra_progress';
+// Exportar a função setAuthToken que estava faltando
+export function setAuthToken(token) {
+  AUTH_TOKEN = token || null;
+}
 
-export const initializeProgress = () => {
-  if (!localStorage.getItem(PROGRESS_KEY)) {
-    const initialProgress = { activityData: {} };
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(initialProgress));
-  }
-};
+// CRA: lê do process.env.REACT_APP_*
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api/v1';
 
-export const getProgress = () => {
-  initializeProgress();
-  return JSON.parse(localStorage.getItem(PROGRESS_KEY));
-};
+const DEFAULT_TIMEOUT = 8000;
+const inflight = new Map();
 
-export const completeActivity = (activityId, helpLevelUsed, studentAnswer, feedbackGiven, feedbackStatus) => {
-  const progress = getProgress();
-  progress.activityData[activityId] = {
-    status: feedbackStatus,
-    helpLevel: helpLevelUsed,
-    answer: studentAnswer,
-    feedback: feedbackGiven,
+function buildKey(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const body = options.body ? String(options.body) : '';
+  return `${method} ${url} ${body}`;
+}
+
+async function safeFetch(url, options = {}, { timeout = DEFAULT_TIMEOUT, dedupe = true } = {}) {
+  const key = buildKey(url, options);
+  if (dedupe && inflight.has(key)) return inflight.get(key);
+
+  const ac = new AbortController();
+  const id = setTimeout(() => ac.abort(), timeout);
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
   };
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
-};
+  if (AUTH_TOKEN) headers.Authorization = `Bearer ${AUTH_TOKEN}`;
+  if (options.method && options.method !== 'GET' && !AUTH_TOKEN) {
+    throw new Error('Operação protegida sem token. Faça login pelo Supabase.');
+  }
 
-export const clearProgress = () => localStorage.removeItem(PROGRESS_KEY);
+  const finalOptions = {
+    ...options,
+    signal: ac.signal,
+    headers,
+    cache: 'no-store',
+  };
 
-export const resetProgress = () => {
-  clearProgress();
-  initializeProgress();
-};
-
-export const getPillarLevels = () => {
-  const progress = getProgress();
-  const pillarLevels = {};
-
-  pillars.forEach(pillar => {
-    const pillarActivities = activities.filter(a => a.pillar === pillar.id);
-    const completedPillarActivities = pillarActivities.filter(a => {
-        const status = progress?.activityData?.[a.id]?.status;
-        return status === 'completo' || status === 'parcial';
-    });
-
-    let maxLevel = 0;
-    if (completedPillarActivities.length > 0) {
-      maxLevel = Math.max(...completedPillarActivities.map(a => a.level));
-    }
-    pillarLevels[pillar.id] = maxLevel;
-  });
-  return pillarLevels;
-};
-
-export const getLevelsDataForPillar = (pillarId) => {
-  const progressData = getProgress().activityData;
-  const levelsData = {};
-
-  const activitiesInPillar = activities.filter(a => a.pillar === pillarId);
-  if (activitiesInPillar.length === 0) return [];
-
-  const maxLevelInPillar = Math.max(...activitiesInPillar.map(a => a.level), 0);
-
-  for (let levelNum = 1; levelNum <= maxLevelInPillar; levelNum++) {
-    const activitiesInLevel = activitiesInPillar.filter(a => a.level === levelNum);
-    if (activitiesInLevel.length === 0) continue;
-
-    const completedInLevel = activitiesInLevel.filter(a => progressData[a.id]?.status === 'completo' || progressData[a.id]?.status === 'parcial');
-    
-    let bestPerformanceStatus = 'nao_iniciado';
-    let bestAutonomy = null;
-
-    if (completedInLevel.length > 0) {
-      const hasCompletedPerfectly = completedInLevel.some(a => progressData[a.id]?.status === 'completo');
-      bestPerformanceStatus = hasCompletedPerfectly ? 'completo' : 'parcial';
+  const p = (async () => {
+    try {
+      console.log(`Fazendo requisição para: ${url}`, { method: finalOptions.method || 'GET' });
+      const res = await fetch(url, finalOptions);
+      console.log(`Status da resposta: ${res.status}`);
       
-      const bestActivity = completedInLevel.find(a => progressData[a.id]?.status === 'completo') || completedInLevel[0];
-      if (bestActivity && progressData[bestActivity.id]) {
-        bestAutonomy = progressData[bestActivity.id].helpLevel;
+      if (!res.ok) {
+        let payload;
+        try { 
+          const errorText = await res.text();
+          console.log('Erro da resposta:', errorText);
+          payload = JSON.parse(errorText); 
+        } catch {
+          console.error('Não foi possível fazer parse do erro como JSON');
+        }
+        const msg = payload?.error || `HTTP ${res.status}`;
+        throw new Error(msg);
       }
+      
+      const responseText = await res.text();
+      console.log('Resposta do servidor:', responseText);
+      
+      if (!responseText.trim()) {
+        return null;
+      }
+      
+      try { 
+        return JSON.parse(responseText); 
+      } catch (parseError) {
+        console.error('Erro ao fazer parse do JSON:', parseError);
+        console.error('Texto da resposta:', responseText);
+        return null; 
+      }
+    } finally {
+      clearTimeout(id);
+      inflight.delete(key);
     }
-    
-    levelsData[levelNum] = {
-      levelNumber: levelNum,
-      totalActivities: activitiesInLevel.length,
-      completedCount: completedInLevel.length,
-      bestPerformanceStatus,
-      bestAutonomy,
-    };
+  })();
+
+  if (dedupe) inflight.set(key, p);
+  return p;
+}
+
+// ---- Públicos (sem mock!) ----
+export async function fetchAllActivities() {
+  const url = `${API_BASE_URL}/activities`;
+  try { 
+    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
+    console.log(`${(result || []).length} atividades carregadas`);
+    return result || []; 
   }
-  return Object.values(levelsData);
+  catch (err) { 
+    console.error('ERRO ao buscar atividades:', err); 
+    return []; 
+  }
+}
+
+export async function fetchPillars() {
+  const url = `${API_BASE_URL}/pillars`;
+  try { 
+    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
+    console.log(`${(result || []).length} pilares carregados`);
+    return result || []; 
+  }
+  catch (err) { 
+    console.error('ERRO ao buscar pilares:', err); 
+    return []; 
+  }
+}
+
+export async function fetchLevels() {
+  const url = `${API_BASE_URL}/levels`;
+  try { 
+    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
+    console.log(`${(result || []).length} níveis carregados`);
+    return result || []; 
+  }
+  catch (err) { 
+    console.error('ERRO ao buscar níveis:', err); 
+    return []; 
+  }
+}
+
+// ---- Protegidos ----
+export async function saveActivityProgress(progressData) {
+  const url = `${API_BASE_URL}/progress`;
+  try {
+    console.log('Salvando progresso:', progressData);
+    const result = await safeFetch(
+      url,
+      { method: 'POST', body: JSON.stringify(progressData) },
+      { dedupe: false }
+    );
+    console.log('Progresso salvo com sucesso:', result);
+    return result;
+  } catch (err) {
+    console.error('ERRO ao salvar progresso:', err);
+    return null;
+  }
+}
+
+export async function resetStudentProgress(studentId) {
+  const url = `${API_BASE_URL}/progress/student/${encodeURIComponent(studentId)}`;
+  try { 
+    const result = await safeFetch(url, { method: 'DELETE' }, { dedupe: false });
+    console.log('Progresso resetado com sucesso:', result);
+    return result; 
+  }
+  catch (err) { 
+    console.error('ERRO ao reiniciar progresso:', err); 
+    return null; 
+  }
+}
+
+// Adicionar função para limpar progresso (alias)
+export const clearStudentProgress = resetStudentProgress;
+
+// Função de teste para verificar conectividade com a API
+export const testApiConnection = async () => {
+  try {
+    console.log('Testando conexão com a API...');
+    const response = await fetch(`${API_BASE_URL.replace('/api/v1', '')}/health`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('API está funcionando:', data);
+      return true;
+    } else {
+      console.error('API retornou erro:', response.status);
+      return false;
+    }
+  } catch (error) {
+    console.error('Erro de conectividade com a API:', error);
+    return false;
+  }
 };
 
-export const getTeacherDashboardData = () => {
-  // CORREÇÃO: Removemos a linha 'const anaProgressData = ...' que não estava sendo utilizada.
-  // A lógica agora é mais direta e clara.
-
-  // Pega os dados reais da Ana (Estudante)
-  const anaPillarLevels = getPillarLevels();
-  const anaData = {
-    studentId: users['ana@decifra.com'].id,
-    studentName: 'Ana', // Usamos o nome diretamente para clareza
-    pillars: {}
+// Função auxiliar para debug
+export const getApiInfo = () => {
+  return {
+    baseUrl: API_BASE_URL,
+    hasToken: !!AUTH_TOKEN,
+    tokenPreview: AUTH_TOKEN ? AUTH_TOKEN.substring(0, 20) + '...' : null,
   };
-  pillars.forEach(pillar => {
-    anaData.pillars[pillar.id] = {
-      overallLevel: anaPillarLevels[pillar.id] || 0,
-      levels: getLevelsDataForPillar(pillar.id),
-    };
-  });
-
-  // Processa os dados FÍCTICIOS dos outros alunos
-  const otherStudentsData = mockTeacherData.map(student => {
-    const studentData = {
-        studentId: student.studentName,
-        studentName: student.studentName,
-        pillars: {}
-    };
-    pillars.forEach(pillar => {
-      const overallLevel = student.progress[pillar.id] || 0;
-      studentData.pillars[pillar.id] = {
-        overallLevel: overallLevel,
-        levels: Array.from({length: overallLevel}, (_, i) => ({
-          levelNumber: i + 1,
-          totalActivities: 1,
-          completedCount: 1,
-          bestPerformanceStatus: 'completo',
-          bestAutonomy: Math.floor(Math.random() * 2)
-        }))
-      };
-    });
-    return studentData;
-  });
-
-  // Combina os dados reais da Ana com os fictícios e retorna
-  return [anaData, ...otherStudentsData];
 };
