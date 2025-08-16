@@ -37,7 +37,7 @@ function App() {
           try { return JSON.parse(s); } catch { return null; }
         };
         const savedUser = safeParse(localStorage.getItem('decifra-user'));
-        const savedToken = localStorage.getItem('decifra-token');
+        //const savedToken = localStorage.getItem('decifra-token');
         if (savedUser) {
           console.log('Usuário encontrado no localStorage, fazendo login automático...');
           const parsedUser = JSON.parse(savedUser);

@@ -1,6 +1,7 @@
 // src/pages/DecompositionPage.js
 import React from 'react';
-import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react';
+//import { ChevronRight, RotateCw, CheckCircle2, Lock } from 'lucide-react';
+import { ChevronRight, RotateCw, CheckCircle2 } from 'lucide-react';
 
 function DecompositionPage({ level, allActivities, progress, onSelectActivity, onBack }) {
   const decompositionActivities = allActivities.filter(a => a.pillar === 'decomposicao' && a.level === level);

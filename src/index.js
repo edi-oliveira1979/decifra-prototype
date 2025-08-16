@@ -1,17 +1,16 @@
 // src/index.js
 
-// Debug inicial para ajudar diagnóstico
-console.log('[Decifra] index.js carregado');
-window.addEventListener('error', (e) => console.error('[GlobalError]', e?.error || e?.message));
-window.addEventListener('unhandledrejection', (e) => console.error('[UnhandledRejection]', e?.reason));
-
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 // 1. IMPORTAÇÃO ADICIONADA: Importamos o arquivo que acabamos de criar.
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+
+// Debug inicial para ajudar diagnóstico
+console.log('[Decifra] index.js carregado');
+window.addEventListener('error', (e) => console.error('[GlobalError]', e?.error || e?.message));
+window.addEventListener('unhandledrejection', (e) => console.error('[UnhandledRejection]', e?.reason));
 
 // Aviso caso as variáveis do Supabase não estejam definidas (CRA injetará strings se existirem)
 if (!process.env.REACT_APP_SUPABASE_URL || !process.env.REACT_APP_SUPABASE_ANON_KEY) {
