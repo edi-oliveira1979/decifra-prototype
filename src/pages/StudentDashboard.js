@@ -11,15 +11,22 @@ const ReactorOrb = ({ level }) => {
 
 function StudentDashboard({ user, pillars, levels, allActivities, progress, onSelectPillar, onReset }) {
   
-  // A lógica para calcular o nível máximo alcançado em cada pilar permanece a mesma.
   const getPillarLevels = () => {
     const pillarLevels = {};
-    if (!pillars || !allActivities) return {}; // allActivities ainda é usado aqui, será removido em otimizações futuras.
+    if (!pillars || !allActivities) return {};
+    
     pillars.forEach(pillar => {
-      const pillarActivities = allActivities.filter(a => a.pillar === pillar.id);
-      const completed = pillarActivities.filter(a => progress?.activityData?.[a.id]?.status === 'done'); // Ajustado para 'done'
+      // --- CORREÇÃO APLICADA AQUI (1/2) ---
+      // O campo no objeto de atividade agora é 'pillar_id'.
+      const pillarActivities = allActivities.filter(a => a.pillar_id === pillar.id);
+      
+      const completed = pillarActivities.filter(a => progress?.activityData?.[a.id]?.status === 'done');
       let maxLevel = 0;
-      if (completed.length > 0) maxLevel = Math.max(...completed.map(a => a.level));
+      if (completed.length > 0) {
+        // --- CORREÇÃO APLICADA AQUI (2/2) ---
+        // O campo no objeto de atividade agora é 'level_id'.
+        maxLevel = Math.max(...completed.map(a => a.level_id));
+      }
       pillarLevels[pillar.id] = maxLevel;
     });
     return pillarLevels;
@@ -28,12 +35,14 @@ function StudentDashboard({ user, pillars, levels, allActivities, progress, onSe
 
   return (
     <div className="container">
-      <div className="header">
+      {/* O cabeçalho foi movido para App.js para ser global, esta seção pode ser removida se não houver botões específicos da página */}
+      {/* <div className="header">
         <p>Logado como: <strong>{user.name}</strong> ({user.role})</p>
         <button onClick={onReset} className="reset-button">
           Reiniciar Progresso
         </button>
       </div>
+      */}
       <h1>Olá, {user.name}!</h1>
       <h2>Seu Progresso em Pensamento Computacional</h2>
       
@@ -41,15 +50,12 @@ function StudentDashboard({ user, pillars, levels, allActivities, progress, onSe
         {pillars.map(p => {
           const currentLevel = pillarLevels[p.id] || 0;
           
-          // --- ALTERAÇÃO PRINCIPAL ---
-          // A lógica que travava os pilares foi removida.
-          // Agora todos os pilares são clicáveis por padrão para o MVP.
           const pillarClass = 'pillar-card clickable';
 
           return (
             <div 
               key={p.id} 
-              onClick={() => onSelectPillar(p.id)} // A função onClick agora é aplicada a todos.
+              onClick={() => onSelectPillar(p.id)}
               className={pillarClass}
             >
               <h3>{p.name}</h3>
@@ -58,6 +64,12 @@ function StudentDashboard({ user, pillars, levels, allActivities, progress, onSe
             </div>
           );
         })}
+      </div>
+       {/* Botão de reset movido para um local mais proeminente no dashboard */}
+       <div style={{ marginTop: '40px', textAlign: 'center' }}>
+        <button onClick={onReset} className="reset-button secondary">
+          Reiniciar Progresso
+        </button>
       </div>
     </div>
   );
