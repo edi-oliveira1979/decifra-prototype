@@ -1,190 +1,244 @@
 // src/services/progressService.js
 
+// Variável para guardar o token de sessão JWT em memória
 let AUTH_TOKEN = null;
 
-// Exportar a função setAuthToken que estava faltando
+// Esta função permite que outros arquivos (como o AuthContext)
+// configurem o token que será usado nas chamadas de API.
 export function setAuthToken(token) {
   AUTH_TOKEN = token || null;
 }
 
-// CRA: lê do process.env.REACT_APP_*
-const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api/v1';
+// A URL base da API agora é lida da variável de ambiente,
+// com um fallback para o ambiente de desenvolvimento local.
+const API_BASE_URL = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '') + '/api/v1';
 
-const DEFAULT_TIMEOUT = 8000;
-const inflight = new Map();
 
-function buildKey(url, options = {}) {
-  const method = (options.method || 'GET').toUpperCase();
-  const body = options.body ? String(options.body) : '';
-  return `${method} ${url} ${body}`;
-}
-
-async function safeFetch(url, options = {}, { timeout = DEFAULT_TIMEOUT, dedupe = true } = {}) {
-  const key = buildKey(url, options);
-  if (dedupe && inflight.has(key)) return inflight.get(key);
-
-  const ac = new AbortController();
-  const id = setTimeout(() => ac.abort(), timeout);
-
+/**
+ * Uma função helper para fazer chamadas de rede de forma segura,
+ * adicionando o token de autenticação e tratando erros comuns.
+ * @param {string} url - O caminho do endpoint (ex: '/activities')
+ * @param {object} options - Opções adicionais para a função fetch (method, body, etc.)
+ * @returns {Promise<any>} - O JSON retornado pela API
+ * @throws {Error} - Lança um erro em caso de falha na rede ou resposta não-ok.
+ */
+const safeFetch = async (url, options = {}) => {
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
-  if (AUTH_TOKEN) headers.Authorization = `Bearer ${AUTH_TOKEN}`;
-  if (options.method && options.method !== 'GET' && !AUTH_TOKEN) {
-    throw new Error('Operação protegida sem token. Faça login pelo Supabase.');
+
+  // Adiciona o token de autorização se ele existir
+  if (AUTH_TOKEN) {
+    headers.Authorization = `Bearer ${AUTH_TOKEN}`;
   }
 
-  const finalOptions = {
-    ...options,
-    signal: ac.signal,
-    headers,
-    cache: 'no-store',
-  };
+  const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
 
-  const p = (async () => {
-    try {
-      console.log(`Fazendo requisição para: ${url}`, { method: finalOptions.method || 'GET' });
-      const res = await fetch(url, finalOptions);
-      console.log(`Status da resposta: ${res.status}`);
-      
-      if (!res.ok) {
-        let payload;
-        try { 
-          const errorText = await res.text();
-          console.log('Erro da resposta:', errorText);
-          payload = JSON.parse(errorText); 
-        } catch {
-          console.error('Não foi possível fazer parse do erro como JSON');
-        }
-        const msg = payload?.error || `HTTP ${res.status}`;
-        throw new Error(msg);
-      }
-      
-      const responseText = await res.text();
-      console.log('Resposta do servidor:', responseText);
-      
-      if (!responseText.trim()) {
-        return null;
-      }
-      
-      try { 
-        return JSON.parse(responseText); 
-      } catch (parseError) {
-        console.error('Erro ao fazer parse do JSON:', parseError);
-        console.error('Texto da resposta:', responseText);
-        return null; 
-      }
-    } finally {
-      clearTimeout(id);
-      inflight.delete(key);
-    }
-  })();
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Falha ao processar resposta de erro da API' }));
+    throw new Error(errorData.error || `Erro na API: ${response.statusText}`);
+  }
 
-  if (dedupe) inflight.set(key, p);
-  return p;
-}
-
-// ---- Públicos (sem mock!) ----
-export async function fetchAllActivities() {
-  const url = `${API_BASE_URL}/activities`;
-  try { 
-    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
-    console.log(`${(result || []).length} atividades carregadas`);
-    return result || []; 
-  }
-  catch (err) { 
-    console.error('ERRO ao buscar atividades:', err); 
-    return []; 
-  }
-}
-
-export async function fetchPillars() {
-  const url = `${API_BASE_URL}/pillars`;
-  try { 
-    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
-    console.log(`${(result || []).length} pilares carregados`);
-    return result || []; 
-  }
-  catch (err) { 
-    console.error('ERRO ao buscar pilares:', err); 
-    return []; 
-  }
-}
-
-export async function fetchLevels() {
-  const url = `${API_BASE_URL}/levels`;
-  try { 
-    const result = await safeFetch(url, { method: 'GET' }, { dedupe: true });
-    console.log(`${(result || []).length} níveis carregados`);
-    return result || []; 
-  }
-  catch (err) { 
-    console.error('ERRO ao buscar níveis:', err); 
-    return []; 
-  }
-}
-
-// ---- Protegidos ----
-export async function saveActivityProgress(progressData) {
-  const url = `${API_BASE_URL}/progress`;
-  try {
-    console.log('Salvando progresso:', progressData);
-    const result = await safeFetch(
-      url,
-      { method: 'POST', body: JSON.stringify(progressData) },
-      { dedupe: false }
-    );
-    console.log('Progresso salvo com sucesso:', result);
-    return result;
-  } catch (err) {
-    console.error('ERRO ao salvar progresso:', err);
-    return null;
-  }
-}
-
-export async function resetStudentProgress(studentId) {
-  const url = `${API_BASE_URL}/progress/student/${encodeURIComponent(studentId)}`;
-  try { 
-    const result = await safeFetch(url, { method: 'DELETE' }, { dedupe: false });
-    console.log('Progresso resetado com sucesso:', result);
-    return result; 
-  }
-  catch (err) { 
-    console.error('ERRO ao reiniciar progresso:', err); 
-    return null; 
-  }
-}
-
-// Adicionar função para limpar progresso (alias)
-export const clearStudentProgress = resetStudentProgress;
-
-// Função de teste para verificar conectividade com a API
-export const testApiConnection = async () => {
-  try {
-    console.log('Testando conexão com a API...');
-    const response = await fetch(`${API_BASE_URL.replace('/api/v1', '')}/health`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('API está funcionando:', data);
-      return true;
-    } else {
-      console.error('API retornou erro:', response.status);
-      return false;
-    }
-  } catch (error) {
-    console.error('Erro de conectividade com a API:', error);
-    return false;
+  // Retorna o JSON apenas se a resposta tiver conteúdo
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return await response.json();
   }
 };
 
-// Função auxiliar para debug
-export const getApiInfo = () => {
-  return {
-    baseUrl: API_BASE_URL,
-    hasToken: !!AUTH_TOKEN,
-    tokenPreview: AUTH_TOKEN ? AUTH_TOKEN.substring(0, 20) + '...' : null,
-  };
+// =================================================================
+// Funções de Conteúdo Público (Pilares, Níveis e Atividades)
+// =================================================================
+
+/**
+ * Busca a lista de pilares do backend.
+ * @returns {Promise<Array>} - Uma lista de objetos de pilar.
+ */
+export const fetchPillars = async () => {
+  try {
+    const data = await safeFetch('/pillars');
+    console.log('Pilares carregados da API com sucesso!');
+    return data;
+  } catch (error) {
+    console.error("ERRO ao buscar pilares:", error);
+    return [];
+  }
+};
+
+/**
+ * Busca a lista de níveis de proficiência do backend.
+ * @returns {Promise<Array>} - Uma lista de objetos de nível.
+ */
+export const fetchLevels = async () => {
+  try {
+    const data = await safeFetch('/levels');
+    console.log('Níveis carregados da API com sucesso!');
+    return data;
+  } catch (error) {
+    console.error("ERRO ao buscar níveis:", error);
+    return [];
+  }
+};
+
+/**
+ * Busca atividades de forma filtrada.
+ * @param {{pillarId?: string, levelId?: number}} filters - Objeto com os filtros desejados.
+ * @returns {Promise<Array>} - Uma lista de atividades que correspondem aos filtros.
+ */
+export const fetchActivities = async ({ pillarId, levelId }) => {
+  try {
+    const params = new URLSearchParams();
+    if (pillarId) params.append('pillar_id', pillarId);
+    if (levelId) params.append('level_id', levelId);
+
+    const queryString = params.toString();
+    const url = `/activities${queryString ? '?' + queryString : ''}`;
+    
+    const data = await safeFetch(url);
+    console.log(`Atividades carregadas de ${url} com sucesso!`);
+    return data;
+  } catch (error) {
+    console.error("ERRO ao buscar atividades filtradas:", error);
+    return [];
+  }
+};
+
+// =================================================================
+// Funções de Perfil de Usuário
+// =================================================================
+
+/**
+ * Busca o perfil completo do usuário logado (incluindo a role correta).
+ * @returns {Promise<object|null>} - O objeto de perfil do usuário ou nulo em caso de erro.
+ */
+export const fetchUserProfile = async () => {
+  try {
+    const data = await safeFetch('/auth/me');
+    console.log("Perfil do usuário carregado com sucesso!", data);
+    return data;
+  } catch (error) {
+    console.error("ERRO ao buscar perfil do usuário:", error);
+    return null;
+  }
+};
+
+
+// =================================================================
+// Funções de Progresso do Aluno
+// =================================================================
+
+/**
+ * Busca todo o progresso de um aluno específico.
+ * @param {string} studentId - O ID do aluno.
+ * @returns {Promise<Array>} - A lista de registros de progresso do aluno.
+ */
+export const fetchStudentProgress = async (studentId) => {
+  if (!studentId) {
+    console.error("fetchStudentProgress chamado sem studentId");
+    return [];
+  }
+  try {
+    const data = await safeFetch(`/progress/student/${studentId}`);
+    console.log(`Progresso do aluno ${studentId} carregado com sucesso!`);
+    return data;
+  } catch (error) {
+    console.error(`ERRO ao buscar progresso do aluno ${studentId}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Salva o resultado de uma atividade no backend.
+ * @param {object} progressData - Os dados de progresso da atividade.
+ */
+export const saveActivityProgress = async (progressData) => {
+    try {
+        const data = await safeFetch('/progress', {
+            method: 'POST',
+            body: JSON.stringify(progressData),
+        });
+        console.log("Progresso salvo na API com sucesso!", data);
+        return data;
+    } catch (error) {
+        console.error("ERRO ao salvar progresso na API:", error);
+        return null;
+    }
+};
+
+/**
+ * Envia um comando para o backend para resetar todo o progresso de um aluno.
+ * @param {string} studentId - O ID do aluno a ter o progresso resetado.
+ */
+export const resetStudentProgress = async (studentId) => {
+  if (!studentId) {
+    console.error("resetStudentProgress chamado sem studentId");
+    return null;
+  }
+  try {
+    const data = await safeFetch(`/progress/student/${studentId}`, {
+      method: 'DELETE',
+    });
+    console.log(`Progresso do aluno ${studentId} reiniciado com sucesso!`);
+    return data;
+  } catch (error) {
+    console.error(`ERRO ao reiniciar progresso do aluno ${studentId}:`, error);
+    return null;
+  }
+};
+
+// =================================================================
+// Funções do Dashboard do Professor
+// =================================================================
+
+/**
+ * Busca as turmas associadas ao professor logado.
+ * @returns {Promise<Array>} - Uma lista de turmas.
+ */
+export const fetchTeacherClasses = async () => {
+  try {
+    const data = await safeFetch('/teacher/classes');
+    console.log("Turmas do professor carregadas com sucesso!");
+    return data;
+  } catch (error) {
+    console.error("ERRO ao buscar turmas do professor:", error);
+    // CORREÇÃO: Retorna um array vazio em caso de erro.
+    return [];
+  }
+};
+
+/**
+ * Busca os alunos de uma turma específica.
+ * @param {string} classId - O ID da turma.
+ * @returns {Promise<Array>} - Uma lista de perfis de alunos.
+ */
+export const fetchStudentsByClass = async (classId) => {
+  if (!classId) return [];
+  try {
+    const data = await safeFetch(`/teacher/classes/${classId}/students`);
+    console.log(`Alunos da turma ${classId} carregados com sucesso!`);
+    return data;
+  } catch (error) {
+    console.error(`ERRO ao buscar alunos da turma ${classId}:`, error);
+    // CORREÇÃO: Retorna um array vazio em caso de erro.
+    return [];
+  }
+};
+
+/**
+ * Busca o progresso de todos os alunos de uma turma específica.
+ * @param {string} classId - O ID da turma.
+ * @returns {Promise<Array>} - Uma lista com todos os registros de progresso da turma.
+ */
+export const fetchProgressByClass = async (classId) => {
+  if (!classId) return [];
+  try {
+    const data = await safeFetch(`/teacher/classes/${classId}/progress`);
+    console.log(`Progresso da turma ${classId} carregado com sucesso!`);
+    return data;
+  } catch (error) {
+    console.error(`ERRO ao buscar progresso da turma ${classId}:`, error);
+    // CORREÇÃO: Retorna um array vazio em caso de erro.
+    return [];
+  }
 };

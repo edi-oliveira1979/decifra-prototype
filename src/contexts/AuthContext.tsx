@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { setAuthToken } from '@/services/progressService';
+import { supabase } from '../lib/supabaseClient';
+import { setAuthToken } from '../services/progressService';
 
 type AuthCtx = {
   session: import('@supabase/supabase-js').Session | null;

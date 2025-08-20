@@ -2,31 +2,25 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 
-	// JWT + JWKS
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/MicahParks/keyfunc"
-)
-
-// ================================
-// Versão / Metadados de build
-// (são sobrescrevíveis via -ldflags no build)
-// ================================
-var (
-	version = "v0.4.0+branch.mvp-implementacao"
-	commit  = "dev"
-	builtAt = "local"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/supabase-community/auth-go"
+	"github.com/supabase-community/auth-go/types"
 )
 
 // ================================
@@ -36,13 +30,14 @@ var (
 type Config struct {
 	DatabaseURL  string
 	SupabaseURL  string
+	JWTSecret    string
 	AllowOrigins []string
 }
 
 var (
-	cfg         Config
-	db          *pgxpool.Pool
-	jwksKeyFunc jwt.Keyfunc // se != nil, valida tokens RS256 vindos do Supabase
+	cfg        Config
+	db         *pgxpool.Pool
+	authClient auth.Client
 )
 
 // ================================
@@ -50,55 +45,96 @@ var (
 // ================================
 
 type Activity struct {
-	ID              string    `json:"id"`
-	Pillar          string    `json:"pillar"`
-	Level           int       `json:"level"`
-	Title           string    `json:"title"`
-	Description     string    `json:"description"`
-	Question        string    `json:"question"`
-	AjudaJSON       string    `json:"ajuda"`
-	AnaliseRespJSON string    `json:"analise_resposta"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              string          `json:"id"`
+	PillarID        string          `json:"pillar_id"`
+	LevelID         int             `json:"level_id"`
+	Title           string          `json:"title"`
+	Description     string          `json:"description"`
+	Question        string          `json:"question"`
+	Ajuda           json.RawMessage `json:"ajuda"`
+	AnaliseResposta json.RawMessage `json:"analise_resposta"`
+	CreatedAt       time.Time       `json:"created_at"`
 }
 
-type ProgressPayload struct {
-	// IMPORTANTE: no modo PRO (JWKS ativo) ignoramos StudentID do payload e usamos o sub do token
-	StudentID     string `json:"student_id"`  // requerido somente quando JWKS estiver DESLIGADO (desenvolvimento)
-	ActivityID    string `json:"activity_id"` // uuid da atividade
-	Status        string `json:"status"`      // "pending" | "done"
+type ProgressInput struct {
+	StudentID     string `json:"student_id"`
+	ActivityID    string `json:"activity_id" binding:"required"`
+	Status        string `json:"status" binding:"required"`
 	HelpLevel     int    `json:"help_level"`
 	StudentAnswer string `json:"student_answer"`
 	FeedbackGiven string `json:"feedback_given"`
+}
+
+type ProgressRecord struct {
+	ActivityID    string    `json:"activity_id"`
+	Status        string    `json:"status"`
+	HelpLevel     int       `json:"help_level"`
+	StudentAnswer string    `json:"student_answer"`
+	FeedbackGiven string    `json:"feedback_given"`
+	SubmittedAt   time.Time `json:"submitted_at"`
+	StudentID     string    `json:"student_id,omitempty"`
+}
+
+type UserCredentials struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type RegisterRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	FullName string `json:"full_name" binding:"required"`
+	Role     string `json:"role" binding:"required"`
+}
+
+type Pillar struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+type Level struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type Class struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Grade      string `json:"grade"`
+	SchoolYear int    `json:"school_year"`
+}
+
+type StudentProfile struct {
+	UserID   string `json:"user_id"`
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
+}
+
+type UserProfile struct {
+	ID       string `json:"id"`
+	FullName string `json:"full_name"`
+	Role     string `json:"role"`
+	Email    string `json:"email"`
 }
 
 // ================================
 // Helpers
 // ================================
 
-func mustGetEnv(k, def string) string {
-	v := os.Getenv(k)
-	if v == "" {
-		return def
-	}
-	return v
-}
-
 func loadConfig() Config {
-	_ = godotenv.Load() // opcional: carrega .env se existir
+	if err := godotenv.Load(); err != nil {
+		log.Println("Aviso: não foi possível carregar o arquivo .env")
+	}
 
-	allow := mustGetEnv("ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-	origins := []string{}
-	for _, o := range strings.Split(allow, ",") {
-		o = strings.TrimSpace(o)
-		if o != "" {
-			origins = append(origins, o)
-		}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("A variável de ambiente JWT_SECRET é obrigatória.")
 	}
 
 	return Config{
-		DatabaseURL:  mustGetEnv("DATABASE_URL", ""),
-		SupabaseURL:  mustGetEnv("SUPABASE_URL", ""),
-		AllowOrigins: origins,
+		DatabaseURL:  os.Getenv("DATABASE_URL"),
+		SupabaseURL:  os.Getenv("SUPABASE_URL"),
+		JWTSecret:    jwtSecret,
+		AllowOrigins: strings.Split(os.Getenv("ALLOW_ORIGINS"), ","),
 	}
 }
 
@@ -110,7 +146,9 @@ func connectDB(ctx context.Context, url string) *pgxpool.Pool {
 	if err != nil {
 		log.Fatalf("Erro ao parsear DATABASE_URL: %v", err)
 	}
-	// Evita problemas de prepared statements em alguns proxies
+
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
 	cfg.ConnConfig.RuntimeParams["standard_conforming_strings"] = "on"
 	cfg.ConnConfig.RuntimeParams["application_name"] = "decifra-backend"
 
@@ -127,86 +165,66 @@ func connectDB(ctx context.Context, url string) *pgxpool.Pool {
 	return pool
 }
 
+func setupAuth() {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseServiceKey := os.Getenv("SUPABASE_SERVICE_KEY")
+	authClient = auth.New(supabaseURL, supabaseServiceKey)
+	log.Println("Cliente de Autenticação Supabase inicializado com sucesso!")
+}
+
+func isTeacherInClass(ctx context.Context, teacherID string, classID string) (bool, error) {
+	var exists bool
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM public.class_members
+			WHERE user_id = $1 AND class_id = $2 AND role = 'Professor'
+		)
+	`
+	err := db.QueryRow(ctx, query, teacherID, classID).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // ================================
 // JWT / Auth
 // ================================
 
-// enableJWKS agora é obrigatório: se falhar, o servidor não sobe.
-func enableJWKS() {
-  if cfg.SupabaseURL == "" {
-    log.Fatal("SUPABASE_URL não definido — obrigatorio para validação JWT do Supabase")
-  }
-  jwksURL := strings.TrimRight(cfg.SupabaseURL, "/") + "/auth/v1/keys"
-  jwks, err := keyfunc.Get(jwksURL, keyfunc.Options{
-    RefreshInterval: time.Minute * 10,
-  })
-  if err != nil {
-    log.Fatalf("Falha ao carregar JWKS (%s): %v — não é possível iniciar sem validação JWT", jwksURL, err)
-  }
-  jwksKeyFunc = jwks.Keyfunc
-  log.Printf("JWKS carregado com sucesso: %s", jwksURL)
-}
-
-// validateAudience valida se o token tem a audience correta (compatível com JWT v4)
-func validateAudience(claims jwt.MapClaims, expectedAud string) bool {
-	aud, ok := claims["aud"]
-	if !ok {
-		return false
-	}
-
-	// aud pode ser string ou array de strings
-	switch v := aud.(type) {
-	case string:
-		return v == expectedAud
-	case []interface{}:
-		for _, audItem := range v {
-			if audStr, ok := audItem.(string); ok && audStr == expectedAud {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// requireAuth é aplicado nas rotas que exigem autenticação.
-// Se jwksKeyFunc == nil, fica em modo DEV e permite requisição sem Bearer; nesse caso, o handler deverá
-// exigir student_id no payload para identificar o aluno.
 func requireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-    // Validação obrigatória: JWKS deve estar carregado e token presente
-
-		authH := c.GetHeader("Authorization")
-		if authH == "" || !strings.HasPrefix(strings.ToLower(authH), "bearer ") {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Bearer token ausente"})
 			return
 		}
-		tokenStr := strings.TrimSpace(strings.TrimPrefix(authH, "Bearer "))
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// jwt/v4: usar Parser com ValidMethods e MapClaims
-		parser := jwt.Parser{
-			ValidMethods: []string{"RS256"},
-		}
 		claims := jwt.MapClaims{}
-		tok, err := parser.ParseWithClaims(tokenStr, claims, jwksKeyFunc)
-		if err != nil || !tok.Valid {
-			log.Printf("Token inválido: %v", err)
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("algoritmo de assinatura inesperado")
+			}
+			return []byte(cfg.JWTSecret), nil
+		})
+
+		if err != nil {
+			log.Printf("Erro ao validar token: %v", err)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token inválido ou expirado"})
+			return
+		}
+
+		if !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			return
 		}
 
-		// Validar audience manualmente (v4 não tem WithAudience)
-		if !validateAudience(claims, "authenticated") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Audience inválida"})
+		userID, ok := claims["sub"].(string)
+		if !ok || userID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token sem ID do usuário"})
 			return
 		}
-
-		// Supabase usa o claim "sub" como id do usuário
-		userID, _ := claims["sub"].(string)
-		if userID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token sem subject"})
-			return
-		}
-
 		c.Set("user_id", userID)
 		c.Next()
 	}
@@ -220,32 +238,75 @@ func healthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// /version — informa metadados do build
-func versionHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"version":  version,
-		"commit":   commit,
-		"built_at": builtAt,
-	})
+func getUserProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var userProfile UserProfile
+	query := `
+		SELECT u.id, u.full_name, u.role, a.email
+		FROM public.users u
+		JOIN auth.users a ON u.id = a.id
+		WHERE u.id = $1
+	`
+	err := db.QueryRow(context.Background(), query, userID).Scan(&userProfile.ID, &userProfile.FullName, &userProfile.Role, &userProfile.Email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Perfil do usuário não encontrado"})
+			return
+		}
+		log.Printf("Erro ao buscar perfil do usuário: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar perfil do usuário"})
+		return
+	}
+
+	c.JSON(http.StatusOK, userProfile)
 }
 
-// --- DEV ONLY ---
-// Simples gerador de token HS256 para testes locais quando JWKS está desligado.
-// Em produção real com Supabase, use sempre o SDK do Supabase no frontend para obter o token RS256.
-
 func getActivities(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-	rows, err := db.Query(ctx, `
-		SELECT id::text, pillar, level, title, description, question,
+	pillarID := c.Query("pillar_id")
+	levelIDStr := c.Query("level_id")
+
+	baseQuery := `
+		SELECT id::text, pillar_id, level_id, title, description, question,
 		       COALESCE(ajuda, '{}')::text,
 		       COALESCE(analise_resposta, '{}')::text,
 		       created_at
 		FROM public.activities
-		ORDER BY created_at DESC, id
-	`)
+	`
+	conditions := make([]string, 0)
+	args := make([]interface{}, 0)
+	paramIndex := 1
+
+	if pillarID != "" {
+		conditions = append(conditions, fmt.Sprintf("pillar_id = $%d", paramIndex))
+		args = append(args, pillarID)
+		paramIndex++
+	}
+
+	if levelIDStr != "" {
+		levelID, err := strconv.Atoi(levelIDStr)
+		if err == nil {
+			conditions = append(conditions, fmt.Sprintf("level_id = $%d", paramIndex))
+			args = append(args, levelID)
+			paramIndex++
+		}
+	}
+
+	query := baseQuery
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query += " ORDER BY created_at DESC, id"
+
+	log.Printf("Executando query de atividades: %s com args: %v", query, args)
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar atividades: " + err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -253,88 +314,109 @@ func getActivities(c *gin.Context) {
 	list := make([]Activity, 0)
 	for rows.Next() {
 		var a Activity
-		if err := rows.Scan(&a.ID, &a.Pillar, &a.Level, &a.Title, &a.Description, &a.Question, &a.AjudaJSON, &a.AnaliseRespJSON, &a.CreatedAt); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if err := rows.Scan(&a.ID, &a.PillarID, &a.LevelID, &a.Title, &a.Description, &a.Question, &a.Ajuda, &a.AnaliseResposta, &a.CreatedAt); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao escanear atividade: " + err.Error()})
 			return
 		}
 		list = append(list, a)
 	}
+
+	if rows.Err() != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro nas linhas do resultado: " + rows.Err().Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, list)
 }
 
 func getPillars(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-	rows, err := db.Query(ctx, `SELECT DISTINCT pillar FROM public.activities ORDER BY pillar`)
+	rows, err := db.Query(context.Background(), "SELECT id, name FROM public.pillars ORDER BY id")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar pilares do banco de dados"})
 		return
 	}
 	defer rows.Close()
-	var out []string
+
+	// CORREÇÃO: Inicializa como um slice vazio para garantir que a resposta JSON seja sempre `[]` e nunca `null`.
+	pillars := make([]Pillar, 0)
 	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		var p Pillar
+		if err := rows.Scan(&p.ID, &p.Name); err != nil {
+			log.Printf("Erro ao escanear pilar: %v", err)
+			continue
 		}
-		out = append(out, s)
+		pillars = append(pillars, p)
 	}
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, pillars)
 }
 
 func getLevels(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-	rows, err := db.Query(ctx, `SELECT DISTINCT level FROM public.activities ORDER BY level`)
+	rows, err := db.Query(context.Background(), "SELECT id, name FROM public.levels ORDER BY id")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar níveis do banco de dados"})
 		return
 	}
 	defer rows.Close()
-	var out []int
+
+	// CORREÇÃO: Inicializa como um slice vazio para garantir que a resposta JSON seja sempre `[]` e nunca `null`.
+	levels := make([]Level, 0)
 	for rows.Next() {
-		var n int
-		if err := rows.Scan(&n); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		var l Level
+		if err := rows.Scan(&l.ID, &l.Name); err != nil {
+			log.Printf("Erro ao escanear nível: %v", err)
+			continue
 		}
-		out = append(out, n)
+		levels = append(levels, l)
 	}
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, levels)
 }
 
-// POST /api/v1/progress
-// Versão corrigida com melhor tratamento de erros e logging
+func getStudentProgress(c *gin.Context) {
+	studentId := c.Param("studentId")
+
+	tokenUserId := c.GetString("user_id")
+	if tokenUserId != studentId {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Acesso não autorizado"})
+		return
+	}
+
+	query := `
+		SELECT activity_id, status, help_level, student_answer, feedback_given, submitted_at
+		FROM public.progress
+		WHERE student_id = $1
+	`
+	rows, err := db.Query(context.Background(), query, studentId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar progresso do aluno"})
+		return
+	}
+	defer rows.Close()
+
+	// CORREÇÃO: Inicializa como um slice vazio para garantir que a resposta JSON seja sempre `[]` e nunca `null`.
+	progressRecords := make([]ProgressRecord, 0)
+	for rows.Next() {
+		var p ProgressRecord
+		if err := rows.Scan(&p.ActivityID, &p.Status, &p.HelpLevel, &p.StudentAnswer, &p.FeedbackGiven, &p.SubmittedAt); err != nil {
+			log.Printf("Erro ao escanear progresso: %v", err)
+			continue
+		}
+		progressRecords = append(progressRecords, p)
+	}
+	c.JSON(http.StatusOK, progressRecords)
+}
+
 func postProgress(c *gin.Context) {
-	var p ProgressPayload
+	var p ProgressInput
 	if err := c.ShouldBindJSON(&p); err != nil {
 		log.Printf("Erro ao fazer bind do JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON inválido"})
 		return
 	}
 
-	// Descobre o student_id: se JWKS ativo, usamos o sub do token; se não, exigimos no payload.
-	studentID := ""
-	if jwksKeyFunc != nil {
-		v, exists := c.Get("user_id")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
-			return
-		}
-		studentID, _ = v.(string)
-		if studentID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token sem sub"})
-			return
-		}
-		log.Printf("Usando student_id do token: %s", studentID)
-	} else {
-		studentID = strings.TrimSpace(p.StudentID)
-		if studentID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "student_id é obrigatório no modo DEV"})
-			return
-		}
-		log.Printf("Usando student_id do payload: %s", studentID)
+	studentID := c.GetString("user_id")
+	if studentID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "ID do usuário não encontrado no token"})
+		return
 	}
 
 	if p.ActivityID == "" || p.Status == "" {
@@ -342,7 +424,6 @@ func postProgress(c *gin.Context) {
 		return
 	}
 
-	// Validar se o status é válido
 	if p.Status != "pending" && p.Status != "done" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "status deve ser 'pending' ou 'done'"})
 		return
@@ -354,7 +435,6 @@ func postProgress(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
-	// UPSERT sem especificar id; deixa o banco gerar automaticamente
 	const q = `
 		INSERT INTO public.progress
 			(student_id, activity_id, status, help_level, student_answer, feedback_given, created_at)
@@ -380,22 +460,19 @@ func postProgress(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"id": id, "message": "Progresso salvo"})
 }
 
-// DELETE /api/v1/progress/student/:studentId
-// Em produção (JWKS ativo), só permite deletar o próprio progresso (studentId precisa ser = sub do token)
 func deleteProgressByStudent(c *gin.Context) {
 	paramID := c.Param("studentId")
 	if paramID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "studentId ausente"})
 		return
 	}
-	if jwksKeyFunc != nil {
-		v, _ := c.Get("user_id")
-		sub, _ := v.(string)
-		if sub == "" || sub != paramID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "não é permitido deletar progresso de outro aluno"})
-			return
-		}
+
+	tokenUserId := c.GetString("user_id")
+	if tokenUserId == "" || tokenUserId != paramID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "não é permitido deletar progresso de outro aluno"})
+		return
 	}
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 	cmd, err := db.Exec(ctx, `DELETE FROM public.progress WHERE student_id = $1`, paramID)
@@ -406,62 +483,227 @@ func deleteProgressByStudent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": cmd.RowsAffected(), "message": "Progresso do aluno reiniciado com sucesso!"})
 }
 
+// ===================================
+// Handlers do Professor
+// ===================================
+
+func getTeacherClasses(c *gin.Context) {
+	teacherID := c.GetString("user_id")
+
+	query := `
+		SELECT c.id, c.name, c.grade, c.school_year
+		FROM public.classes c
+		JOIN public.class_members cm ON c.id = cm.class_id
+		WHERE cm.user_id = $1 AND cm.role = 'Professor'
+	`
+	rows, err := db.Query(context.Background(), query, teacherID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar turmas do professor"})
+		return
+	}
+	defer rows.Close()
+
+	classes := make([]Class, 0)
+	for rows.Next() {
+		var cl Class
+		if err := rows.Scan(&cl.ID, &cl.Name, &cl.Grade, &cl.SchoolYear); err != nil {
+			log.Printf("Erro ao escanear turma: %v", err)
+			continue
+		}
+		classes = append(classes, cl)
+	}
+	c.JSON(http.StatusOK, classes)
+}
+
+func getStudentsByClass(c *gin.Context) {
+	teacherID := c.GetString("user_id")
+	classID := c.Param("classId")
+
+	isMember, err := isTeacherInClass(context.Background(), teacherID, classID)
+	if err != nil || !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Acesso não autorizado a esta turma"})
+		return
+	}
+
+	query := `
+		SELECT u.id, u.full_name, a.email
+		FROM public.users u
+		JOIN public.class_members cm ON u.id = cm.user_id
+		JOIN auth.users a ON u.id = a.id
+		WHERE cm.class_id = $1 AND u.role = 'Estudante'
+	`
+	rows, err := db.Query(context.Background(), query, classID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar alunos da turma"})
+		return
+	}
+	defer rows.Close()
+
+	students := make([]StudentProfile, 0)
+	for rows.Next() {
+		var s StudentProfile
+		if err := rows.Scan(&s.UserID, &s.FullName, &s.Email); err != nil {
+			log.Printf("Erro ao escanear aluno: %v", err)
+			continue
+		}
+		students = append(students, s)
+	}
+	c.JSON(http.StatusOK, students)
+}
+
+func getStudentProgressByClass(c *gin.Context) {
+	teacherID := c.GetString("user_id")
+	classID := c.Param("classId")
+
+	isMember, err := isTeacherInClass(context.Background(), teacherID, classID)
+	if err != nil || !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Acesso não autorizado a esta turma"})
+		return
+	}
+
+	query := `
+		SELECT p.student_id, p.activity_id, p.status, p.help_level, p.student_answer, p.feedback_given, p.submitted_at
+		FROM public.progress p
+		JOIN public.class_members cm ON p.student_id = cm.user_id
+		WHERE cm.class_id = $1
+	`
+	rows, err := db.Query(context.Background(), query, classID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao buscar progresso da turma"})
+		return
+	}
+	defer rows.Close()
+
+	progressRecords := make([]ProgressRecord, 0)
+	for rows.Next() {
+		var p ProgressRecord
+		if err := rows.Scan(&p.StudentID, &p.ActivityID, &p.Status, &p.HelpLevel, &p.StudentAnswer, &p.FeedbackGiven, &p.SubmittedAt); err != nil {
+			log.Printf("Erro ao escanear progresso: %v", err)
+			continue
+		}
+		progressRecords = append(progressRecords, p)
+	}
+	c.JSON(http.StatusOK, progressRecords)
+}
+
+
 // ================================
 // Boot
 // ================================
 
 func main() {
 	cfg = loadConfig()
-	ctx := context.Background()
-	db = connectDB(ctx, cfg.DatabaseURL)
-	enableJWKS()
+	db = connectDB(context.Background(), cfg.DatabaseURL)
+	setupAuth()
+	defer db.Close()
 
-	r := gin.New()
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-
-	// Middleware global: adiciona X-App-Version em todas as respostas
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("X-App-Version", version)
-		c.Next()
-	})
-
-	// CORS: inclua aqui os domínios do Vercel/GitHub Pages além do localhost
-	corsCfg := cors.Config{
+	router := gin.Default()
+	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowOrigins,
 		AllowMethods:     []string{"GET", "POST", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length", "X-App-Version"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
+	}))
+
+	router.GET("/health", healthHandler)
+
+	authRoutes := router.Group("/auth")
+	{
+		authRoutes.POST("/register", func(c *gin.Context) {
+			var req RegisterRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Dados de cadastro inválidos"})
+				return
+			}
+
+			userData, err := authClient.Signup(types.SignupRequest{
+				Email:    req.Email,
+				Password: req.Password,
+				Data: map[string]interface{}{
+					"full_name": req.FullName,
+					"role":      req.Role,
+				},
+			})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao criar usuário: " + err.Error()})
+				return
+			}
+
+			sql := "INSERT INTO public.users (id, full_name, role) VALUES ($1, $2, $3)"
+			_, err = db.Exec(context.Background(), sql, userData.ID, req.FullName, req.Role)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar perfil: " + err.Error()})
+				return
+			}
+			switch req.Role {
+			case "Estudante":
+				_, err = db.Exec(context.Background(), "INSERT INTO public.students (user_id) VALUES ($1)", userData.ID)
+			case "Professor":
+				_, err = db.Exec(context.Background(), "INSERT INTO public.teachers (user_id) VALUES ($1)", userData.ID)
+			}
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao salvar perfil específico: " + err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusCreated, gin.H{"message": "Usuário cadastrado com sucesso!"})
+		})
+
+		authRoutes.POST("/login", func(c *gin.Context) {
+			var req UserCredentials
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Credenciais inválidas"})
+				return
+			}
+
+			loginData, err := authClient.Token(types.TokenRequest{
+				GrantType: "password",
+				Email:     req.Email,
+				Password:  req.Password,
+			})
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "E-mail ou senha incorretos"})
+				return
+			}
+
+			c.JSON(http.StatusOK, loginData)
+		})
 	}
-	r.Use(cors.New(corsCfg))
 
-	// Health & Version
-	r.GET("/health", healthHandler)
-	r.GET("/version", versionHandler)
-
-	// Removido: fluxo de login DEV. Toda autenticação deve vir do Supabase.
-
-	api := r.Group("/api/v1")
+	api := router.Group("/api/v1")
 	{
 		api.GET("/activities", getActivities)
 		api.GET("/pillars", getPillars)
 		api.GET("/levels", getLevels)
-
-    // Rotas que escrevem exigem JWT válido do Supabase em todos os cenários
-    api.POST("/progress", requireAuth(), postProgress)
-    api.DELETE("/progress/student/:studentId", requireAuth(), deleteProgressByStudent)
+		api.GET("/progress/student/:studentId", requireAuth(), getStudentProgress)
+		api.POST("/progress", requireAuth(), postProgress)
+		api.DELETE("/progress/student/:studentId", requireAuth(), deleteProgressByStudent)
 	}
 
-	addr := mustGetEnv("ADDR", ":8080")
-	log.Printf("Servidor ouvindo em %s | versão=%s | JWKS=%s", addr, version, func() string {
-		if jwksKeyFunc != nil {
-			return "ON"
-		}
-		return "OFF"
-	}())
-	if err := r.Run(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("Erro ao subir servidor: %v", err)
+	authApi := router.Group("/api/v1/auth")
+	authApi.Use(requireAuth())
+	{
+		authApi.GET("/me", getUserProfile)
+	}
+
+	teacherApi := router.Group("/api/v1/teacher")
+	teacherApi.Use(requireAuth())
+	{
+		teacherApi.GET("/classes", getTeacherClasses)
+		teacherApi.GET("/classes/:classId/students", getStudentsByClass)
+		teacherApi.GET("/classes/:classId/progress", getStudentProgressByClass)
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	addr := ":" + port
+	log.Printf("Servidor iniciado e ouvindo em %s (modo=%s)", addr, gin.Mode())
+	log.Println("Rotas de autenticação disponíveis em /auth/login e /auth/register")
+	if err := router.Run(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("Erro ao iniciar o servidor: %v", err)
 	}
 }

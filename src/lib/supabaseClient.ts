@@ -5,10 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-// Pequena validação útil em dev
+// VALIDAÇÃO OBRIGATÓRIA - garante que as variáveis existam
 if (!supabaseUrl || !supabaseAnonKey) {
-  // eslint-disable-next-line no-console
-  console.warn('Supabase envs ausentes: verifique REACT_APP_SUPABASE_URL e REACT_APP_SUPABASE_ANON_KEY no .env.local');
+  throw new Error(
+    'Variáveis de ambiente do Supabase ausentes! ' +
+    'Verifique se REACT_APP_SUPABASE_URL e REACT_APP_SUPABASE_ANON_KEY ' +
+    'estão definidas no arquivo .env.local'
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -18,3 +21,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Tipos úteis para usar no resto da aplicação
+export type User = {
+  id: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+};
+
+export type AuthSession = {
+  access_token: string;
+  refresh_token: string;
+  user: User;
+};

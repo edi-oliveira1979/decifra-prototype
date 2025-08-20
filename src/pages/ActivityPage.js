@@ -69,12 +69,18 @@ function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBac
   };
 
   const renderHelpContent = () => {
+    // A verificação inicial já é segura com `activity?.ajuda`
     if (helpLevel === 0 || !activity?.ajuda) return null;
+    
+    // --- CORREÇÃO ADICIONADA AQUI ---
+    // Adicionamos optional chaining (`?.`) em cada acesso para garantir que
+    // o código não quebre se o objeto `ajuda` existir, mas não tiver uma das
+    // propriedades esperadas (dica_contextual, etc.).
     return (
       <div className="hint-box">
-        {helpLevel >= 1 && <p><strong>Dica Contextual:</strong> {activity.ajuda.dica_contextual}</p>}
-        {helpLevel >= 2 && <p><strong>Pergunta para Refletir:</strong> {activity.ajuda.pergunta_socaratica || activity.ajuda.pergunta_socratica}</p>}
-        {helpLevel >= 3 && <p><strong>Exemplo Prático:</strong> {activity.ajuda.exemplo_pratico}</p>}
+        {helpLevel >= 1 && <p><strong>Dica Contextual:</strong> {activity?.ajuda?.dica_contextual}</p>}
+        {helpLevel >= 2 && <p><strong>Pergunta para Refletir:</strong> {activity?.ajuda?.pergunta_socaratica || activity?.ajuda?.pergunta_socratica}</p>}
+        {helpLevel >= 3 && <p><strong>Exemplo Prático:</strong> {activity?.ajuda?.exemplo_pratico}</p>}
       </div>
     );
   };

@@ -1,12 +1,11 @@
 // src/pages/LevelSelectionPage.js
-import React from 'react';
-// 1. As importações de dados e serviços foram removidas.
-// O componente agora importa apenas o que é estritamente necessário para a UI.
-import { pillars as allPillars, levels } from '../data/mockData';
+
+import React, { useState, useEffect } from 'react';
 import { CheckCircle2, RotateCw, ChevronRight, KeyRound } from 'lucide-react';
+// Importamos o serviço para buscar as atividades de forma dinâmica.
+import { fetchActivities } from '../services/progressService';
 
 // --- Componentes Auxiliares (sem alterações) ---
-
 const PerformanceIcon = ({ status }) => {
   if (status === 'completo') return <CheckCircle2 size={20} className="icon-success" />;
   if (status === 'parcial') return <RotateCw size={20} className="icon-warning" />;
@@ -26,45 +25,48 @@ const AutonomyIcon = ({ helps }) => {
   );
 };
 
-/**
- * Componente que exibe os níveis de desafio para um pilar selecionado.
- * @param {object} props - Propriedades passadas pelo App.js
- * @param {string} props.pillarId - O ID do pilar a ser exibido.
- * @param {Array} props.allActivities - A lista completa de todas as atividades.
- * @param {object} props.progress - O objeto de progresso atual do aluno.
- * @param {Function} props.onSelectLevel - Callback para navegar para a lista de atividades de um nível.
- * @param {Function} props.onBack - Callback para navegar de volta para a tela anterior.
- */
-function LevelSelectionPage({ pillarId, allActivities, progress, onSelectLevel, onBack }) {
-  const pillarInfo = allPillars.find(p => p.id === pillarId);
+
+// --- ALTERAÇÃO PRINCIPAL: Componente não recebe mais 'allActivities' ---
+function LevelSelectionPage({ pillarId, pillars, levels, progress, onSelectLevel, onBack }) {
+  const pillarInfo = pillars.find(p => p.id === pillarId);
   const progressData = progress.activityData;
+  
+  // Novo estado para armazenar apenas as atividades relevantes para este pilar.
+  const [activitiesInPillar, setActivitiesInPillar] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 3. A lógica interna agora usa as props 'allActivities' e 'progress' para calcular os dados.
-  // Esta função calcula as estatísticas de cada nível.
+  // useEffect para buscar os dados da API quando o componente for montado ou o pillarId mudar.
+  useEffect(() => {
+    const loadActivities = async () => {
+      if (!pillarId) return;
+      setIsLoading(true);
+      const activities = await fetchActivities({ pillarId });
+      setActivitiesInPillar(activities);
+      setIsLoading(false);
+    };
+
+    loadActivities();
+  }, [pillarId]); // A dependência garante que a busca será refeita se o pilar mudar.
+
   const getLevelsData = () => {
-    const levelsData = {};
-    const activitiesInPillar = allActivities.filter(a => a.pillar === pillarId);
-    if (!activitiesInPillar.length) return [];
+    // A lógica de cálculo agora opera sobre o estado local 'activitiesInPillar',
+    // que é um conjunto de dados muito menor e mais focado.
+    if (!activitiesInPillar || activitiesInPillar.length === 0) {
+        return [];
+    }
 
-    const maxLevel = Math.max(...activitiesInPillar.map(a => a.level), 0);
+    const levelsData = {};
+    const maxLevel = Math.max(...activitiesInPillar.map(a => a.level_id), 0);
 
     for (let i = 1; i <= maxLevel; i++) {
-      const activitiesInLevel = activitiesInPillar.filter(a => a.level === i);
+      const activitiesInLevel = activitiesInPillar.filter(a => a.level_id === i);
       if (activitiesInLevel.length === 0) continue;
 
-      const completedInLevel = activitiesInLevel.filter(a => progressData[a.id]?.status === 'completo' || progressData[a.id]?.status === 'parcial');
+      const completedInLevel = activitiesInLevel.filter(a => progressData?.[a.id]?.status === 'done');
       
       let bestPerformanceStatus = 'nao_iniciado';
-      let bestAutonomy = null;
-
       if (completedInLevel.length > 0) {
-        const hasCompletedPerfectly = completedInLevel.some(a => progressData[a.id]?.status === 'completo');
-        bestPerformanceStatus = hasCompletedPerfectly ? 'completo' : 'parcial';
-        
-        const bestActivity = completedInLevel.find(a => progressData[a.id]?.status === 'completo') || completedInLevel[0];
-        if (bestActivity && progressData[bestActivity.id]) {
-          bestAutonomy = progressData[bestActivity.id].helpLevel;
-        }
+        bestPerformanceStatus = 'completo';
       }
       
       levelsData[i] = {
@@ -72,7 +74,6 @@ function LevelSelectionPage({ pillarId, allActivities, progress, onSelectLevel, 
         totalActivities: activitiesInLevel.length,
         completedCount: completedInLevel.length,
         bestPerformanceStatus,
-        bestAutonomy,
       };
     }
     return Object.values(levelsData);
@@ -86,29 +87,34 @@ function LevelSelectionPage({ pillarId, allActivities, progress, onSelectLevel, 
       <h1>Pilar: {pillarInfo?.name}</h1>
       <h2>Selecione um nível para ver as atividades.</h2>
       <div className="level-list">
-        {levelsData.map((level, index) => {
-          const prevLevel = index > 0 ? levelsData[index - 1] : null;
-          const prevLevelPassed = prevLevel?.bestPerformanceStatus === 'completo' || prevLevel?.bestPerformanceStatus === 'parcial';
-          const isLocked = prevLevel && !prevLevelPassed;
+        {isLoading ? (
+          <p>Carregando níveis...</p>
+        ) : levelsData.length === 0 ? (
+          <p>Nenhuma atividade encontrada para este pilar ainda.</p>
+        ) : (
+          levelsData.map((level, index) => {
+            const prevLevel = index > 0 ? levelsData[index - 1] : null;
+            const prevLevelPassed = prevLevel?.bestPerformanceStatus === 'completo';
+            const isLocked = index > 0 && !prevLevelPassed; // O primeiro nível nunca é bloqueado
 
-          return (
-            <div 
-              key={level.levelNumber} 
-              className={`level-card ${isLocked ? 'disabled' : 'clickable'}`}
-              onClick={() => !isLocked && onSelectLevel(level.levelNumber)}
-            >
-              <div className='level-card-header'>
-                <h3>Nível {level.levelNumber}: {levels[level.levelNumber]}</h3>
-                {isLocked && <span className='lock-icon'>🔒</span>}
+            return (
+              <div 
+                key={level.levelNumber} 
+                className={`level-card ${isLocked ? 'disabled' : 'clickable'}`}
+                onClick={() => !isLocked && onSelectLevel(level.levelNumber)}
+              >
+                <div className='level-card-header'>
+                  <h3>Nível {level.levelNumber}: {levels[level.levelNumber]}</h3>
+                  {isLocked && <span className='lock-icon'>🔒</span>}
+                </div>
+                <div className="level-card-stats">
+                  <span>Atividades: {level.completedCount}/{level.totalActivities}</span>
+                  <span>Desempenho: <PerformanceIcon status={level.bestPerformanceStatus} /></span>
+                </div>
               </div>
-              <div className="level-card-stats">
-                <span>Atividades: {level.completedCount}/{level.totalActivities}</span>
-                <span>Desempenho: <PerformanceIcon status={level.bestPerformanceStatus} /></span>
-                <span>Autonomia: <AutonomyIcon helps={level.bestAutonomy} /></span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

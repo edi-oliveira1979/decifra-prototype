@@ -4,146 +4,142 @@ import React, { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import StudentDashboard from './pages/StudentDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
-import LevelSelectionPage from './pages/LevelSelectionPage'; 
-import DecompositionPage from './pages/DecompositionPage';
+import LevelSelectionPage from './pages/LevelSelectionPage';
+import ActivityListPage from './pages/ActivityListPage';
 import ActivityPage from './pages/ActivityPage';
 import './App.css';
-import { fetchAllActivities, saveActivityProgress, setAuthToken } from './services/progressService'; 
-import { getLocalProgress, saveLocalProgress, resetLocalProgress } from './services/localStorageService';
+
+// --- Imports de Serviços Atualizados ---
+// Adicionamos 'fetchActivities' para ser usado no login.
+import { 
+  fetchPillars, 
+  fetchLevels, 
+  fetchStudentProgress, 
+  resetStudentProgress, 
+  fetchUserProfile, 
+  fetchActivities 
+} from './services/progressService';
+import { setAuthToken } from './services/progressService';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('login'); 
+  const [view, setView] = useState('login');
   const [allActivities, setAllActivities] = useState([]);
+  const [pillars, setPillars] = useState([]);
+  const [levels, setLevels] = useState({});
   const [studentProgress, setStudentProgress] = useState({ activityData: {} });
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [currentPillarId, setCurrentPillarId] = useState(null);
   const [currentLevel, setCurrentLevel] = useState(null);
   const [currentActivityId, setCurrentActivityId] = useState(null);
-  
+
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
-      console.log('Carregando dados iniciais...');
+      const [pillarsData, levelsData] = await Promise.all([
+        fetchPillars(),
+        fetchLevels()
+      ]);
       
-      try {
-        const activities = await fetchAllActivities();
-        console.log(`${activities.length} atividades carregadas`);
-        setAllActivities(activities);
-        
-        // Verificar se há usuário salvo no localStorage
-        const safeParse = (s) => {
-          try { return JSON.parse(s); } catch { return null; }
-        };
-        const savedUser = safeParse(localStorage.getItem('decifra-user'));
-        //const savedToken = localStorage.getItem('decifra-token');
-        if (savedUser) {
-          console.log('Usuário encontrado no localStorage, fazendo login automático...');
-          const parsedUser = JSON.parse(savedUser);
-          handleLogin(parsedUser, true);
+      setPillars(pillarsData);
+      const levelsMap = levelsData.reduce((acc, level) => {
+          acc[level.id] = level.name;
+          return acc;
+      }, {});
+      setLevels(levelsMap);
+
+      const savedUserJSON = localStorage.getItem('decifra-user');
+      if (savedUserJSON) {
+        const savedUser = JSON.parse(savedUserJSON);
+        const savedToken = localStorage.getItem('decifra-token');
+        if (savedUser && savedToken) {
+          await handleLogin({ user: savedUser, access_token: savedToken }, true);
         }
-      } catch (error) {
-        console.error('Erro ao carregar atividades:', error);
-        // Continuar mesmo sem atividades para permitir login
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
     };
     loadInitialData();
   }, []);
-  
-  const handleLogin = (loginData, isReload = false) => {
-    console.log('Processando login:', loginData);
-    
-    let userData, accessToken;
-    
-    // Para reload do localStorage, loginData já é o user
-    if (isReload) {
-      userData = loginData;
-      accessToken = localStorage.getItem('decifra-token') || null;
-    } else {
-      // Para login normal, loginData vem do Supabase normalizado em LoginPage.js: { user, access_token }
 
-      userData = loginData.user;
-      accessToken = loginData.access_token;
-    }
+  const handleLogin = async (loginData, isReload = false) => {
+    const { access_token } = loginData;
     
-    if (!userData) {
-      console.error('Dados de usuário inválidos:', loginData);
+    setAuthToken(access_token);
+
+    const userProfile = await fetchUserProfile();
+
+    if (!userProfile) {
+      handleLogout();
+      if (!isReload) {
+        alert("Erro ao buscar perfil do usuário. Verifique o console do backend e se o usuário existe na tabela 'public.users'.");
+      }
+      setIsLoading(false);
       return;
     }
-    
-    setUser(userData);
-    
-    // Configurar o token no progressService (JWT do Supabase)
-    if (accessToken) {
-      setAuthToken(accessToken);
-      if (!isReload) {
-        localStorage.setItem('decifra-token', accessToken);
-      }
-    }
-    
+
+    setUser(userProfile);
     if (!isReload) {
-      localStorage.setItem('decifra-user', JSON.stringify(userData));
+        localStorage.setItem('decifra-user', JSON.stringify(userProfile));
+        localStorage.setItem('decifra-token', access_token);
     }
     
-    if (userData.role === 'Estudante') {
-      setStudentProgress(getLocalProgress());
+    // --- CORREÇÃO ADICIONADA AQUI ---
+    // Após o login, buscamos todos os dados necessários de uma vez para popular a aplicação.
+    setIsLoading(true);
+    
+    // Usamos Promise.all para buscar as atividades e o progresso do aluno (se for estudante) em paralelo.
+    const [activitiesData, progressRecords] = await Promise.all([
+      fetchActivities({}), // Chamada sem filtros para buscar TODAS as atividades.
+      userProfile.role === 'Estudante' ? fetchStudentProgress(userProfile.id) : Promise.resolve(null)
+    ]);
+
+    // Populamos o estado global de atividades, que será usado pelo ActivityPage.
+    setAllActivities(activitiesData);
+        
+    if (userProfile.role === 'Estudante') {
+      const progressMap = (progressRecords || []).reduce((acc, record) => {
+        acc[record.activity_id] = record;
+        return acc;
+      }, {});
+
+      setStudentProgress({ activityData: progressMap });
       setView('student_dashboard');
-    } else if (userData.role === 'Professor') {
-      setView('teacher_dashboard');
     } else {
-      // Fallback para papel desconhecido
-      setView('student_dashboard');
+      // Para o professor, não precisamos fazer mais nada aqui,
+      // pois o TeacherDashboard buscará os dados da turma selecionada.
+      setView('teacher_dashboard');
     }
-    
-    console.log(`Login bem-sucedido: ${userData.name} (${userData.role})`);
+    setIsLoading(false);
   };
   
   const handleLogout = () => {
     console.log('Fazendo logout...');
     setUser(null);
     setView('login');
-    setAuthToken(null); // Limpar token do progressService
+    setAuthToken(null);
     localStorage.removeItem('decifra-user');
     localStorage.removeItem('decifra-token');
   };
   
-  const handleReset = () => {
+  const handleReset = async () => {
     if(user && user.role === 'Estudante') {
-      console.log('Resetando progresso local...');
-      resetLocalProgress();
-      setStudentProgress(getLocalProgress());
+      if (window.confirm('Tem certeza que deseja reiniciar todo o seu progresso? Esta ação não pode ser desfeita.')) {
+        console.log('Resetando progresso via API...');
+        await resetStudentProgress(user.id);
+        setStudentProgress({ activityData: {} });
+      }
     }
   };
 
-  const handleProgressUpdate = async (activityId, progressDetails) => {
-    try {
-      // Atualizar localStorage primeiro
-      const newProgress = getLocalProgress();
-      newProgress.activityData[activityId] = progressDetails;
-      saveLocalProgress(newProgress);
-      setStudentProgress(newProgress);
-
-      // Tentar salvar no backend
-      console.log('Salvando progresso no backend:', progressDetails);
-      const result = await saveActivityProgress({ 
-        student_id: user.id, 
-        activity_id: activityId,
-        status: progressDetails.status,
-        help_level: progressDetails.helpLevel,
-        student_answer: progressDetails.answer,
-        feedback_given: progressDetails.feedback
-      });
-      
-      if (result) {
-        console.log('Progresso salvo no backend com sucesso');
-      }
-    } catch (error) {
-      console.error('Erro ao salvar progresso no backend:', error);
-      // Não impedir o usuário de continuar se o backend falhar
-    }
+  const handleProgressUpdate = (activityId, progressDetails) => {
+    setStudentProgress(prevProgress => {
+      const newActivityData = {
+        ...prevProgress.activityData,
+        [activityId]: progressDetails,
+      };
+      return { activityData: newActivityData };
+    });
   };
   
   const goToLevelSelection = (pillarId) => { setCurrentPillarId(pillarId); setView('level_selection'); };
@@ -154,25 +150,20 @@ function App() {
   const backToActivityList = () => { setCurrentActivityId(null); setView('activity_list'); };
 
   const renderContent = () => {
-    if (isLoading) {
-      return <div className="container"><h2>Carregando ecossistema Decifra...</h2></div>;
-    }
-    
-    if (!user) {
-      return <LoginPage onLoginSuccess={handleLogin} />;
-    }
-    
+    if (isLoading) return <div className="container"><h2>Carregando ecossistema Decifra...</h2></div>;
+    if (!user) return <LoginPage onLoginSuccess={handleLogin} />;
+
     switch (view) {
       case 'student_dashboard':
-        return <StudentDashboard user={user} allActivities={allActivities} progress={studentProgress} onSelectPillar={goToLevelSelection} onReset={handleReset} />;
+        return <StudentDashboard user={user} pillars={pillars} levels={levels} allActivities={allActivities} progress={studentProgress} onSelectPillar={goToLevelSelection} onReset={handleReset} />;
       case 'level_selection':
-        return <LevelSelectionPage pillarId={currentPillarId} allActivities={allActivities} progress={studentProgress} onSelectLevel={goToActivityList} onBack={backToStudentDashboard} />;
+        return <LevelSelectionPage pillarId={currentPillarId} pillars={pillars} levels={levels} progress={studentProgress} onSelectLevel={goToActivityList} onBack={backToStudentDashboard} />;
       case 'activity_list':
-        return <DecompositionPage level={currentLevel} allActivities={allActivities} progress={studentProgress} onSelectActivity={goToActivityPage} onBack={backToLevelSelection} />;
+        return <ActivityListPage pillarId={currentPillarId} level={currentLevel} pillars={pillars} levels={levels} progress={studentProgress} onSelectActivity={goToActivityPage} onBack={backToLevelSelection} />;
       case 'activity_page':
         return <ActivityPage activityId={currentActivityId} allActivities={allActivities} user={user} onProgressUpdate={handleProgressUpdate} onBack={backToActivityList} />;
       case 'teacher_dashboard':
-        return <TeacherDashboard user={user} allActivities={allActivities} studentProgress={studentProgress} />;
+        return <TeacherDashboard user={user} allActivities={allActivities} />;
       default:
         return <LoginPage onLoginSuccess={handleLogin} />;
     }
@@ -186,9 +177,7 @@ function App() {
           <button onClick={handleLogout}>Sair</button>
         </div>
       )}
-      <div className="container">
-        {renderContent()}
-      </div>
+      <div className="container">{renderContent()}</div>
     </div>
   );
 }
