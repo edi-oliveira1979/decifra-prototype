@@ -28,7 +28,6 @@ const safeFetch = async (url, options = {}) => {
     ...(options.headers || {}),
   };
 
-  // Adiciona o token de autorização se ele existir
   if (AUTH_TOKEN) {
     headers.Authorization = `Bearer ${AUTH_TOKEN}`;
   }
@@ -40,7 +39,6 @@ const safeFetch = async (url, options = {}) => {
     throw new Error(errorData.error || `Erro na API: ${response.statusText}`);
   }
 
-  // Retorna o JSON apenas se a resposta tiver conteúdo
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
     return await response.json();
@@ -51,10 +49,6 @@ const safeFetch = async (url, options = {}) => {
 // Funções de Conteúdo Público (Pilares, Níveis e Atividades)
 // =================================================================
 
-/**
- * Busca a lista de pilares do backend.
- * @returns {Promise<Array>} - Uma lista de objetos de pilar.
- */
 export const fetchPillars = async () => {
   try {
     const data = await safeFetch('/pillars');
@@ -66,10 +60,6 @@ export const fetchPillars = async () => {
   }
 };
 
-/**
- * Busca a lista de níveis de proficiência do backend.
- * @returns {Promise<Array>} - Uma lista de objetos de nível.
- */
 export const fetchLevels = async () => {
   try {
     const data = await safeFetch('/levels');
@@ -81,11 +71,6 @@ export const fetchLevels = async () => {
   }
 };
 
-/**
- * Busca atividades de forma filtrada.
- * @param {{pillarId?: string, levelId?: number}} filters - Objeto com os filtros desejados.
- * @returns {Promise<Array>} - Uma lista de atividades que correspondem aos filtros.
- */
 export const fetchActivities = async ({ pillarId, levelId }) => {
   try {
     const params = new URLSearchParams();
@@ -108,10 +93,6 @@ export const fetchActivities = async ({ pillarId, levelId }) => {
 // Funções de Perfil de Usuário
 // =================================================================
 
-/**
- * Busca o perfil completo do usuário logado (incluindo a role correta).
- * @returns {Promise<object|null>} - O objeto de perfil do usuário ou nulo em caso de erro.
- */
 export const fetchUserProfile = async () => {
   try {
     const data = await safeFetch('/auth/me');
@@ -125,14 +106,33 @@ export const fetchUserProfile = async () => {
 
 
 // =================================================================
-// Funções de Progresso do Aluno
+// Funções de Análise e Progresso
 // =================================================================
 
 /**
- * Busca todo o progresso de um aluno específico.
- * @param {string} studentId - O ID do aluno.
- * @returns {Promise<Array>} - A lista de registros de progresso do aluno.
+ * NOVA FUNÇÃO: Envia a resposta do aluno para o endpoint de análise do backend.
+ * @param {string} activityId - O ID da atividade.
+ * @param {string} answer - O texto da resposta do aluno.
+ * @returns {Promise<object|null>} - O resultado da análise {status, feedback}.
  */
+export const analyzeActivityAnswer = async (activityId, answer) => {
+  try {
+    const data = await safeFetch(`/activities/${activityId}/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({ answer }),
+    });
+    console.log("Resposta analisada com sucesso!", data);
+    return data;
+  } catch (error) {
+    console.error("ERRO ao analisar resposta:", error);
+    // Retorna um feedback de erro genérico para ser exibido ao usuário
+    return {
+      status: 'pending',
+      feedback: 'Não foi possível analisar sua resposta no momento. Tente novamente.',
+    };
+  }
+};
+
 export const fetchStudentProgress = async (studentId) => {
   if (!studentId) {
     console.error("fetchStudentProgress chamado sem studentId");
@@ -148,10 +148,6 @@ export const fetchStudentProgress = async (studentId) => {
   }
 };
 
-/**
- * Salva o resultado de uma atividade no backend.
- * @param {object} progressData - Os dados de progresso da atividade.
- */
 export const saveActivityProgress = async (progressData) => {
     try {
         const data = await safeFetch('/progress', {
@@ -166,10 +162,6 @@ export const saveActivityProgress = async (progressData) => {
     }
 };
 
-/**
- * Envia um comando para o backend para resetar todo o progresso de um aluno.
- * @param {string} studentId - O ID do aluno a ter o progresso resetado.
- */
 export const resetStudentProgress = async (studentId) => {
   if (!studentId) {
     console.error("resetStudentProgress chamado sem studentId");
@@ -191,10 +183,6 @@ export const resetStudentProgress = async (studentId) => {
 // Funções do Dashboard do Professor
 // =================================================================
 
-/**
- * Busca as turmas associadas ao professor logado.
- * @returns {Promise<Array>} - Uma lista de turmas.
- */
 export const fetchTeacherClasses = async () => {
   try {
     const data = await safeFetch('/teacher/classes');
@@ -202,16 +190,10 @@ export const fetchTeacherClasses = async () => {
     return data;
   } catch (error) {
     console.error("ERRO ao buscar turmas do professor:", error);
-    // CORREÇÃO: Retorna um array vazio em caso de erro.
     return [];
   }
 };
 
-/**
- * Busca os alunos de uma turma específica.
- * @param {string} classId - O ID da turma.
- * @returns {Promise<Array>} - Uma lista de perfis de alunos.
- */
 export const fetchStudentsByClass = async (classId) => {
   if (!classId) return [];
   try {
@@ -220,16 +202,10 @@ export const fetchStudentsByClass = async (classId) => {
     return data;
   } catch (error) {
     console.error(`ERRO ao buscar alunos da turma ${classId}:`, error);
-    // CORREÇÃO: Retorna um array vazio em caso de erro.
     return [];
   }
 };
 
-/**
- * Busca o progresso de todos os alunos de uma turma específica.
- * @param {string} classId - O ID da turma.
- * @returns {Promise<Array>} - Uma lista com todos os registros de progresso da turma.
- */
 export const fetchProgressByClass = async (classId) => {
   if (!classId) return [];
   try {
@@ -238,7 +214,6 @@ export const fetchProgressByClass = async (classId) => {
     return data;
   } catch (error) {
     console.error(`ERRO ao buscar progresso da turma ${classId}:`, error);
-    // CORREÇÃO: Retorna um array vazio em caso de erro.
     return [];
   }
 };

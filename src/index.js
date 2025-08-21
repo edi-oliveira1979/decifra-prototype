@@ -2,9 +2,9 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
+import './index.css'; // <-- Importa os estilos de base e fontes
+import './App.css';   // <-- Importa os estilos dos componentes
 import App from './App';
-// 1. IMPORTAÇÃO ADICIONADA: Importamos o arquivo que acabamos de criar.
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Debug inicial para ajudar diagnóstico

@@ -1,52 +1,50 @@
-// src/pages/ActivityListPage.js (Anteriormente DecompositionPage.js)
+// src/pages/ActivityListPage.js
 
 import React, { useState, useEffect } from 'react';
-import { ScanLine, CheckCircle2, Lock } from 'lucide-react';
-// Importa o serviço para buscar atividades
+// Importamos os ícones corretos do protótipo, incluindo o RotateCw para o estado "parcial"
+import { CheckCircle2, ChevronRight, Lock, RotateCw } from 'lucide-react';
 import { fetchActivities } from '../services/progressService';
 
-// Mapa de ícones de status para clareza
+// --- Ícones de Status ATUALIZADOS ---
+// O mapa agora inclui o estado 'parcial' e usa as classes CSS corretas do protótipo.
 const statusIconMap = {
-  pending:  { Icon: ScanLine,    className: "status-icon status--pending",  label: "Pendente" },
-  done:     { Icon: CheckCircle2, className: "status-icon status--complete", label: "Concluído" },
-  locked:   { Icon: Lock,        className: "status-icon status--locked",   label: "Bloqueado"},
+  pending:  { Icon: ChevronRight, className: "icon-pending" }, // Não iniciado
+  partial:  { Icon: RotateCw,     className: "icon-warning" }, // Iniciado, mas não concluído
+  done:     { Icon: CheckCircle2, className: "icon-success" }, // Concluído
+  locked:   { Icon: Lock,         className: "status--locked"   }, // Mantido para consistência
 };
 
-// Componente de linha de atividade (sem grandes alterações)
+// --- Componente de Linha de Atividade REFATORADO ---
+// Nenhuma mudança no JSX, apenas no mapa de ícones que ele consome.
 function ActivityRow({ activity, status = "pending", onClick }) {
-  const { Icon, className, label } = statusIconMap[status] ?? statusIconMap.pending;
+  const { Icon, className } = statusIconMap[status] ?? statusIconMap.pending;
 
   return (
-    <div
-      className={`item-row ${status !== 'locked' ? 'clickable' : ''}`}
-      onClick={status !== 'locked' ? onClick : undefined}
+    // A classe 'activity-list' e 'li' do protótipo são representadas aqui pela estrutura de grid do App.css
+    <li
+      className={`item-row clickable`}
+      onClick={onClick}
       role="button"
-      aria-label={`${activity.title} — ${label}`}
+      aria-label={activity.title}
     >
-      <div className="item-meta">
-        <div className="item-title">{activity.title}</div>
-        <span className="muted">{label}</span>
-      </div>
-      <div title={label} aria-hidden="true" className={className}>
-        <Icon size={22} strokeWidth={2.4} />
-      </div>
-    </div>
+      <span className="activity-title">{activity.title}</span>
+      <span className="activity-icon" aria-hidden="true">
+        <Icon size={24} className={className} />
+      </span>
+    </li>
   );
 }
 
-// --- ALTERAÇÃO PRINCIPAL: Componente agora é genérico e busca seus próprios dados ---
+
 function ActivityListPage({ pillarId, level, pillars, levels, progress, onSelectActivity, onBack }) {
-  // Estado local para armazenar as atividades desta página
   const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Busca as informações do pilar atual para exibir o nome correto
   const pillar = pillars.find(p => p.id === pillarId) || {};
   const levelName = levels[level] || `Nível ${level}`;
   
   const progressData = progress.activityData;
 
-  // useEffect para buscar as atividades específicas quando o pilar ou nível mudarem.
   useEffect(() => {
     const loadActivities = async () => {
       if (!pillarId || !level) return;
@@ -57,28 +55,37 @@ function ActivityListPage({ pillarId, level, pillars, levels, progress, onSelect
     };
 
     loadActivities();
-  }, [pillarId, level]); // Dependências garantem a busca quando o usuário navegar
+  }, [pillarId, level]);
 
   return (
     <div className="container">
       <button onClick={onBack} className="back-button">&larr; Voltar para Níveis</button>
       <header className="section">
-        {/* Título e descrição agora são dinâmicos */}
         <h1>{pillar.name} - {levelName}</h1>
         <p className="muted">Selecione uma atividade para começar.</p>
       </header>
 
       <section className="section">
-        <div className="grid">
+        {/* Usamos a tag `ul` e a classe `activity-list` para corresponder ao protótipo */}
+        <ul className="activity-list">
           {isLoading ? (
             <p>Carregando atividades...</p>
           ) : activities.length === 0 ? (
             <p>Nenhuma atividade encontrada para este nível.</p>
           ) : (
-            // O mapeamento agora é feito sobre o estado 'activities' local
             activities.map(activity => {
               const activityProgress = progressData?.[activity.id];
-              const status = activityProgress?.status || 'pending';
+              
+              // --- LÓGICA DE STATUS ATUALIZADA ---
+              // Agora diferenciamos entre não iniciado ('pending') e iniciado mas não concluído ('partial').
+              let status = 'pending'; // Padrão: não iniciado
+              if (activityProgress) {
+                if (activityProgress.status === 'done') {
+                  status = 'done'; // Concluído
+                } else {
+                  status = 'partial'; // Tem progresso salvo, mas não está 'done'
+                }
+              }
 
               return (
                 <ActivityRow
@@ -90,7 +97,7 @@ function ActivityListPage({ pillarId, level, pillars, levels, progress, onSelect
               );
             })
           )}
-        </div>
+        </ul>
       </section>
     </div>
   );

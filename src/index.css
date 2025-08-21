@@ -1,10 +1,25 @@
+/* src/index.css */
+
+/* 1. Importa as fontes do Google Fonts definidas no protótipo */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Nunito:wght@800&display=swap');
+
+/* 2. Aplica um reset básico e define a fonte e a cor de fundo globais */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #F7F8FC; /* Cor de fundo do :root */
+  color: #4A4A4A; /* Cor de texto principal do :root */
+}
+
+/* 3. Garante que padding e border não aumentem o tamanho dos elementos */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 code {

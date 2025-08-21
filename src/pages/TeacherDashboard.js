@@ -1,61 +1,65 @@
 // src/pages/TeacherDashboard.js
 import React, { useState, useEffect, useMemo } from 'react';
-import { KeyRound } from 'lucide-react';
-// Importa os serviços da API necessários para o dashboard do professor
+// Importamos os ícones que serão usados no novo LevelSummary
+import { CheckCircle2, RotateCw } from 'lucide-react';
 import { 
   fetchTeacherClasses, 
   fetchStudentsByClass, 
   fetchProgressByClass 
 } from '../services/progressService';
 
-/**
- * Componente que exibe o "Índice de Autonomia" de um aluno.
- * A lógica de cores e texto permanece, recebendo a contagem de ajudas.
- * @param {{helpCount: number}} props
- */
-function AutonomyIndex({ helpCount = 0 }) {
-  let cl = "autonomy gold";
-  if (helpCount >= 1 && helpCount <= 2) cl = "autonomy blue";
-  if (helpCount >= 3) cl = "autonomy gray";
-
-  const label =
-    helpCount === 0 ? "Autonomia Alta" : helpCount <= 2 ? "Autonomia Média" : "Autonomia Baixa";
-
-  return (
-    <div className={cl} role="figure" aria-label={`Índice de Autonomia — ${label}`}>
-      <span className="icon" aria-hidden="true">
-        <KeyRound size={22} strokeWidth={2.4} />
-      </span>
-      <span>{label}</span>
-    </div>
-  );
-}
+// --- SUBCOMPONENTE REINTRODUZIDO DO PROTÓTIPO ---
+// Renderiza os ícones de progresso para cada nível dentro de um pilar.
+const LevelSummary = ({ levelsData }) => {
+    if (!levelsData || levelsData.length === 0) {
+        return <div className="level-summary-placeholder">Nenhuma atividade iniciada.</div>;
+    }
+    return (
+        <div className="level-summary">
+            {levelsData.map(level => {
+                let icon = null;
+                if (level.bestPerformanceStatus === 'completo') {
+                    icon = <CheckCircle2 size={16} className="icon-success" />;
+                } else if (level.bestPerformanceStatus === 'parcial') {
+                    icon = <RotateCw size={16} className="icon-warning" />;
+                }
+                
+                if (icon) {
+                    return (
+                        <div key={level.levelNumber} className="level-dot" title={`Nível ${level.levelNumber}`}>
+                            {icon} L{level.levelNumber}
+                        </div>
+                    );
+                }
+                return null;
+            })}
+        </div>
+    );
+};
 
 // --- COMPONENTE PRINCIPAL REFATORADO ---
-function TeacherDashboard({ user, allActivities }) {
-  // Estados para gerenciar os dados dinâmicos do dashboard
+function TeacherDashboard({ user, pillars, levels: levelNames, allActivities }) {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState([]);
   const [progressRecords, setProgressRecords] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Efeito para buscar as turmas do professor quando o componente é montado.
+  // Efeito para buscar as turmas (sem alterações)
   useEffect(() => {
     const loadClasses = async () => {
       setIsLoading(true);
       const fetchedClasses = await fetchTeacherClasses();
       setClasses(fetchedClasses);
-      // Se houver apenas uma turma, seleciona-a automaticamente.
       if (fetchedClasses.length === 1) {
         setSelectedClassId(fetchedClasses[0].id);
       }
       setIsLoading(false);
     };
     loadClasses();
-  }, []); // O array vazio [] garante que isso rode apenas uma vez.
+  }, []);
 
-  // Efeito para buscar os dados dos alunos e seus progressos sempre que uma nova turma for selecionada.
+  // Efeito para buscar os dados da turma (sem alterações)
   useEffect(() => {
     if (!selectedClassId) {
       setStudents([]);
@@ -74,36 +78,58 @@ function TeacherDashboard({ user, allActivities }) {
       setIsLoading(false);
     };
     loadClassData();
-  }, [selectedClassId]); // Roda sempre que o `selectedClassId` mudar.
+  }, [selectedClassId]);
 
-  // `useMemo` para processar e agregar os dados dos alunos de forma eficiente.
-  // Este cálculo só será refeito se `students` ou `progressRecords` mudarem.
+  // --- LÓGICA DE PROCESSAMENTO DE DADOS TOTALMENTE REFATORADA ---
+  // Agora calcula o progresso detalhado por pilar e nível para cada aluno.
   const studentData = useMemo(() => {
     return students.map(student => {
       const studentProgress = progressRecords.filter(p => p.student_id === student.user_id);
-      
-      const totalHelpCount = studentProgress.reduce((sum, p) => sum + p.help_level, 0);
-      
-      let lastActivityTitle = 'Nenhuma atividade enviada';
-      if (studentProgress.length > 0) {
-        // Encontra a atividade com a data de envio mais recente
-        const lastProgress = studentProgress.reduce((latest, current) => 
-          new Date(latest.submitted_at) > new Date(current.submitted_at) ? latest : current
-        );
-        // TODO: Para performance, o ideal seria a API já retornar o título da atividade.
-        // Por agora, usamos o `allActivities` que vem do App.js.
-        const activityInfo = allActivities.find(a => a.id === lastProgress.activity_id);
-        lastActivityTitle = activityInfo ? activityInfo.title : 'Atividade desconhecida';
-      }
+      const progressMap = studentProgress.reduce((acc, p) => {
+        acc[p.activity_id] = p;
+        return acc;
+      }, {});
+
+      const pillarsData = {};
+      pillars.forEach(pillar => {
+        const activitiesInPillar = allActivities.filter(a => a.pillar_id === pillar.id);
+        if (activitiesInPillar.length === 0) return;
+
+        const maxLevel = Math.max(...activitiesInPillar.map(a => a.level_id), 0);
+        const levelsSummary = [];
+        let overallLevel = 0;
+
+        for (let i = 1; i <= maxLevel; i++) {
+          const activitiesInLevel = activitiesInPillar.filter(a => a.level_id === i);
+          if (activitiesInLevel.length === 0) continue;
+
+          const doneActivities = activitiesInLevel.filter(a => progressMap[a.id]?.status === 'done');
+          const partialActivities = activitiesInLevel.filter(a => progressMap[a.id] && progressMap[a.id]?.status !== 'done');
+          
+          let bestPerformanceStatus = 'nao_iniciado';
+          if (doneActivities.length > 0) bestPerformanceStatus = 'completo';
+          else if (partialActivities.length > 0) bestPerformanceStatus = 'parcial';
+
+          if (bestPerformanceStatus !== 'nao_iniciado') {
+            levelsSummary.push({ levelNumber: i, bestPerformanceStatus });
+          }
+          if (bestPerformanceStatus === 'completo') {
+            overallLevel = Math.max(overallLevel, i);
+          }
+        }
+        
+        if (levelsSummary.length > 0) {
+            pillarsData[pillar.id] = { overallLevel, levels: levelsSummary };
+        }
+      });
 
       return {
-        id: student.user_id,
-        name: student.full_name,
-        helpCount: totalHelpCount,
-        lastActivity: lastActivityTitle,
+        studentId: student.user_id,
+        studentName: student.full_name,
+        pillars: pillarsData,
       };
     });
-  }, [students, progressRecords, allActivities]);
+  }, [students, progressRecords, pillars, allActivities]);
 
   const handleClassChange = (e) => {
     setSelectedClassId(e.target.value);
@@ -113,9 +139,9 @@ function TeacherDashboard({ user, allActivities }) {
     <div className="container">
       <header className="section">
         <h1>Dashboard do Professor</h1>
-        <p className="muted">
-          Acompanhe a turma e identifique quem está mais autônomo(a) para intervir melhor.
-        </p>
+        <h2 className="muted">
+          Acompanhamento da Turma
+        </h2>
       </header>
 
       <section className="section">
@@ -134,20 +160,34 @@ function TeacherDashboard({ user, allActivities }) {
 
       {selectedClassId && (
         <section className="section">
-          <h2>Turma — Índice de Autonomia</h2>
+          {/* --- JSX REFATORADO PARA USAR O LAYOUT DE QUADRANTES DO PROTÓTIPO --- */}
           {isLoading ? (
             <p>Carregando dados da turma...</p>
           ) : (
-            <div className="grid sm-2 md-3">
-              {studentData.length > 0 ? studentData.map((st) => (
-                <div key={st.id} className="card clickable" role="region" aria-label={st.name}>
-                  <div className="card-title">{st.name}</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                    <div>
-                      <div className="muted">Última atividade:</div>
-                      <div style={{ fontWeight: 600 }}>{st.lastActivity}</div>
-                    </div>
-                    <AutonomyIndex helpCount={st.helpCount} />
+            <div className="teacher-grid">
+              {studentData.length > 0 ? studentData.map((student) => (
+                <div key={student.studentId} className="student-card">
+                  <div className="student-header">
+                      <div className="avatar teacher-avatar">{student.studentName.charAt(0)}</div>
+                      <h3>{student.studentName}</h3>
+                  </div>
+                  <div className="pillars-quadrant">
+                      {pillars.map(pillar => {
+                          const pillarData = student.pillars[pillar.id];
+                          // Se o aluno não tiver progresso neste pilar, o quadrante não é renderizado.
+                          if (!pillarData) return <div key={pillar.id} className="quadrant empty"><h4>{pillar.name}</h4><span>-</span></div>;
+                          
+                          return (
+                              <div key={pillar.id} className="quadrant">
+                                  <h4>{pillar.name}</h4>
+                                  <div className="quadrant-data main-level">
+                                      <span>Nível Geral:</span>
+                                      <strong>{levelNames[pillarData.overallLevel]}</strong>
+                                  </div>
+                                  <LevelSummary levelsData={pillarData.levels} />
+                              </div>
+                          )
+                      })}
                   </div>
                 </div>
               )) : <p>Nenhum aluno encontrado nesta turma.</p>}

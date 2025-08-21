@@ -1,6 +1,7 @@
 // src/pages/StudentDashboard.js
 
-import React from 'react';
+// 1. Importamos o hook 'useMemo' do React.
+import React, { useMemo } from 'react';
 
 // Componente para a "órbita" que mostra o nível de progresso.
 const ReactorOrb = ({ level }) => {
@@ -11,40 +12,34 @@ const ReactorOrb = ({ level }) => {
 
 function StudentDashboard({ user, pillars, levels, allActivities, progress, onSelectPillar, onReset }) {
   
-  const getPillarLevels = () => {
-    const pillarLevels = {};
-    if (!pillars || !allActivities) return {};
+  // --- LÓGICA DE CÁLCULO MOVIDA PARA useMemo ---
+  // O hook useMemo "memoriza" o resultado de pillarLevels.
+  // A função só será re-executada se uma das dependências no array [pillars, allActivities, progress] mudar.
+  // Isso resolve o problema de timing, pois o cálculo agora espera até que allActivities seja preenchido.
+  const pillarLevels = useMemo(() => {
+    const calculatedLevels = {};
+    // Adicionamos uma verificação de segurança para garantir que os dados existem antes de processar.
+    if (!pillars || !allActivities || !progress?.activityData) {
+      return {};
+    }
     
     pillars.forEach(pillar => {
-      // --- CORREÇÃO APLICADA AQUI (1/2) ---
-      // O campo no objeto de atividade agora é 'pillar_id'.
       const pillarActivities = allActivities.filter(a => a.pillar_id === pillar.id);
       
-      const completed = pillarActivities.filter(a => progress?.activityData?.[a.id]?.status === 'done');
+      const completed = pillarActivities.filter(a => progress.activityData[a.id]?.status === 'done');
       let maxLevel = 0;
       if (completed.length > 0) {
-        // --- CORREÇÃO APLICADA AQUI (2/2) ---
-        // O campo no objeto de atividade agora é 'level_id'.
         maxLevel = Math.max(...completed.map(a => a.level_id));
       }
-      pillarLevels[pillar.id] = maxLevel;
+      calculatedLevels[pillar.id] = maxLevel;
     });
-    return pillarLevels;
-  };
-  const pillarLevels = getPillarLevels();
+    return calculatedLevels;
+  }, [pillars, allActivities, progress]); // O cálculo será refeito quando estas props mudarem.
 
   return (
     <div className="container">
-      {/* O cabeçalho foi movido para App.js para ser global, esta seção pode ser removida se não houver botões específicos da página */}
-      {/* <div className="header">
-        <p>Logado como: <strong>{user.name}</strong> ({user.role})</p>
-        <button onClick={onReset} className="reset-button">
-          Reiniciar Progresso
-        </button>
-      </div>
-      */}
-      <h1>Olá, {user.name}!</h1>
-      <h2>Seu Progresso em Pensamento Computacional</h2>
+      <h1>Olá, {user.full_name || user.name}!</h1>
+      <h2 className="muted">Seu Progresso em Pensamento Computacional</h2>
       
       <div className="pillar-grid">
         {pillars.map(p => {
@@ -65,7 +60,6 @@ function StudentDashboard({ user, pillars, levels, allActivities, progress, onSe
           );
         })}
       </div>
-       {/* Botão de reset movido para um local mais proeminente no dashboard */}
        <div style={{ marginTop: '40px', textAlign: 'center' }}>
         <button onClick={onReset} className="reset-button secondary">
           Reiniciar Progresso
