@@ -1,4 +1,7 @@
 // src/pages/TeacherDashboard.js
+
+//teste de PR e commit
+
 import React, { useState, useEffect, useMemo } from 'react';
 // Importamos os ícones que serão usados no novo LevelSummary
 import { CheckCircle2, RotateCw } from 'lucide-react';
