@@ -115,6 +115,14 @@ export const fetchUserProfile = async () => {
  * @param {string} answer - O texto da resposta do aluno.
  * @returns {Promise<object|null>} - O resultado da análise {status, feedback}.
  */
+export const analyzeWithAI = async (activityId, answer) => {
+  // A função `safeFetch` já trata a autenticação e erros.
+  return await safeFetch(`/activities/${activityId}/analyze-ai`, {
+    method: 'POST',
+    body: JSON.stringify({ answer }),
+  });
+};
+
 export const analyzeActivityAnswer = async (activityId, answer) => {
   try {
     const data = await safeFetch(`/activities/${activityId}/analyze`, {

@@ -1,6 +1,6 @@
 // src/pages/ActivityPage.js
 import React, { useState, useEffect } from 'react';
-import { analyzeActivityAnswer, saveActivityProgress } from '../services/progressService';
+import { analyzeActivityAnswer, analyzeWithAI, saveActivityProgress } from '../services/progressService';
 
 function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBack }) {
   const activity = allActivities.find(a => a.id === activityId);
@@ -26,7 +26,18 @@ function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBac
     }
     setIsLoading(true);
 
-    const analysis = await analyzeActivityAnswer(activityId, answer);
+    let analysis;
+
+    // --- LÓGICA DO MENTOR HÍBRIDO ---
+    if (navigator.onLine) {
+      console.log("Online: Usando análise com IA.");
+      analysis = await analyzeWithAI(activityId, answer);
+    } else {
+      console.log("Offline: Usando análise semântica local.");
+      analysis = await analyzeActivityAnswer(activityId, answer);
+    }
+
+    //const analysis = await analyzeActivityAnswer(activityId, answer);
     
     setFeedbackResult(analysis);
     setShowFeedbackModal(true);
