@@ -1,5 +1,5 @@
 // src/pages/ActivityPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 // import { analyzeActivityAnswer, analyzeWithAI, saveActivityProgress } from '../services/progressService';
 import { analyzeWithAI, saveActivityProgress } from '../services/progressService';
 import { analyzeOffline } from '../services/offlineAnalysisService';
@@ -13,10 +13,11 @@ function ActivityPage({
   onBack,
   isTeacherSandbox = false, // ← NOVO: habilita “modo professor (sandbox)”
 }) {
-  if (!activityId) {
-    return <div className="container"><h2>Selecione uma atividade para começar.</h2></div>;
-  }
-  const activity = allActivities.find(a => a.id === activityId);
+  // Seleciona atividade SEM criar hooks condicionais
+  const activity = useMemo(
+    () => (allActivities || []).find(a => String(a.id) === String(activityId)),
+    [allActivities, activityId]
+  );
   
   const [answer, setAnswer] = useState('');
   const [helpLevel, setHelpLevel] = useState(0);
@@ -34,6 +35,7 @@ function ActivityPage({
   }, [activityId]);
 
   const handleSubmit = async () => {
+      if (!activity) return; // guarda-chuva
       if (!answer) {
         alert('Por favor, digite uma resposta.');
         return;
@@ -132,18 +134,21 @@ function ActivityPage({
     );
   };
 
-  if (!activity) {
-    return (
-      <div className="container">
-        <h1>Atividade não encontrada.</h1>
-        {/* CORREÇÃO: Garantimos que o botão de voltar tenha a classe correta mesmo na tela de erro. */}
-        <button onClick={onBack} className="back-button">&larr; Voltar</button>
-      </div>
-    );
-  }
 
   return (
     <div className="container">
+      {/* Estados de vazio/erro SEM envolver Hooks */}
+      {!activityId && (
+        <div className="hint-box" style={{ marginBottom: 12 }}>
+          <h2>Selecione uma atividade para começar.</h2>
+        </div>
+      )}
+      {activityId && !activity && (
+        <div className="hint-box" style={{ marginBottom: 12 }}>
+          <h2>Atividade não encontrada.</h2>
+          <button onClick={onBack} className="back-button">&larr; Voltar</button>
+        </div>
+      )}
       {/* NOVO: Ferramentas de Professor (sandbox) */}
       {isTeacherSandbox && (
         <div className="teacher-tools" style={{ display:'flex', gap:12, alignItems:'center', marginBottom:12 }}>
@@ -171,14 +176,14 @@ function ActivityPage({
 
       {/* CORREÇÃO: A classe do botão de voltar foi explicitamente definida para 'back-button'. */}
       <button onClick={onBack} className="back-button">&larr; Voltar para a Lista</button>
-      <h1>{activity.title}</h1>
-      <p>{activity.description}</p>
-      <h2>{activity.question}</h2>
+      <h1>{activity?.title}</h1>
+      <p>{activity?.description}</p>
+      <h2>{activity?.question}</h2>
 
       <textarea
         value={answer}
         onChange={(e) => setAnswer(e.target.value)}
-        rows="5"
+        rows={5}
         placeholder="Digite sua resposta aqui..."
         disabled={isLoading}
       />
