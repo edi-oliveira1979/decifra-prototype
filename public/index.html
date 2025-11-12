@@ -3,9 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <title>Decifra — Atoms</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Viewport com safe-areas para iOS (notch) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <!-- Cor do tema (PWA) -->
     <meta name="theme-color" content="#4A90E2" />
+    <!-- Evita iOS transformar números em links de telefone automaticamente -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- PWA: Android e iOS -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
 
     <!-- Preconnect fontes -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

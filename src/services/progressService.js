@@ -43,6 +43,9 @@ const safeFetch = async (url, options = {}) => {
   if (contentType && contentType.includes('application/json')) {
     return await response.json();
   }
+  // Em alguns endpoints poderemos receber 204 ou texto; retorne algo útil
+  const text = await response.text();
+  return text ? { ok: true, text } : { ok: true };
 };
 
 // =================================================================
@@ -224,4 +227,67 @@ export const fetchProgressByClass = async (classId) => {
     console.error(`ERRO ao buscar progresso da turma ${classId}:`, error);
     return [];
   }
+};
+
+// NOVO: status de vinculação (aluno/professor)
+export const fetchMembership = async () => {
+  return await safeFetch('/classes/membership');
+};
+
+// NOVO: professor consulta "gabarito pedagógico" da atividade
+export const fetchExpectedForActivity = async (activityId) => {
+  return await safeFetch(`/teacher/activities/${activityId}/expected`, {
+    method: 'GET',
+  });
+};
+
+// =================================================================
+// NOVAS FUNÇÕES — Gestão de Turmas (Escrita)
+// =================================================================
+
+/**
+ * Cria uma nova turma para o professor logado.
+ * @param {{name: string, grade?: string, school_year?: number, school_id?: string}} payload
+ * @returns {Promise<{id:string,name:string,grade?:string,school_year?:number,invite_code?:string}>}
+ */
+export const createTeacherClass = async (payload) => {
+  // payload mínimo: { name }
+  return await safeFetch('/teacher/classes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Gera um novo código de convite para uma turma existente do professor.
+ * @param {string} classId
+ * @returns {Promise<{code:string}>}
+ */
+export const createInviteForClass = async (classId) => {
+  return await safeFetch(`/teacher/classes/${classId}/invites`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * Lista os convites de uma turma do professor (útil para visualizar/renovar).
+ * @param {string} classId
+ * @returns {Promise<Array<{id:string,code:string,created_at:string,expires_at?:string,max_uses?:number,used_count:number}>>}
+ */
+export const fetchClassInvites = async (classId) => {
+  return await safeFetch(`/teacher/classes/${classId}/invites`, {
+    method: 'GET',
+  });
+};
+
+/**
+ * (Aluno) Entrar em uma turma usando um código de convite.
+ * @param {string} code
+ * @returns {Promise<{joined:boolean,message?:string,class?:{id:string}}>}
+ */
+export const joinClassByCode = async (code) => {
+  return await safeFetch('/classes/join-by-code', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 };

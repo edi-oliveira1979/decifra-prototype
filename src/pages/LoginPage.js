@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient.js';
 
 // A função onNavigateToRegister foi adicionada às props
 // para permitir a navegação para a tela de cadastro.
-function LoginPage({ onLoginSuccess, onNavigateToRegister }) {
+function LoginPage({ onLoginSuccess, onNavigateToRegister, onNavigateToForgot }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -82,15 +82,27 @@ function LoginPage({ onLoginSuccess, onNavigateToRegister }) {
         </form>
 
         {/* Link para navegar para a página de cadastro */}
-        <p style={{ marginTop: '20px', fontSize: '14px', textAlign: 'center' }}>
+        <p style={{ marginTop: 20, fontSize: 14, textAlign: 'center' }}>
           Ainda não tem uma conta?{' '}
-          <span
+          <button
+            type="button"
             onClick={onNavigateToRegister}
-            style={{ color: 'var(--cor-primaria)', fontWeight: 'bold', cursor: 'pointer' }}
+            style={{ background:'none', border:'none', color:'var(--cor-primaria)', fontWeight:'bold', cursor:'pointer', padding:0 }}
           >
             Cadastre-se
-          </span>
+          </button>
         </p>
+
+        {/* NOVO BLOCO: link "Esqueci minha senha" */}
+        <p style={{ marginTop: 10, fontSize: 13, textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={onNavigateToForgot}
+            style={{ background:'none', border:'none', color:'var(--cor-primaria)', fontWeight:'bold', cursor:'pointer', textDecoration:'underline', padding:0 }}
+          >
+            Esqueci minha senha
+          </button>
+        </p>       
       </div>
     </div>
   );

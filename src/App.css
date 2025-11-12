@@ -10,6 +10,9 @@
   --cor-texto-secundario: #86868B;
   --cor-fundo: #F7F8FC;
   --cor-fundo-card: #FFFFFF;
+  --sombra-card: 0 6px 20px rgba(0,0,0,.06);
+  --sombra-card-hover: 0 10px 28px rgba(0,0,0,.10);
+  --raio: 20px;
   --fonte-titulo: 'Nunito', sans-serif;
   --fonte-corpo: 'Inter', sans-serif;
 }
@@ -60,11 +63,24 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
   padding: 5px 20px;
   background: var(--cor-fundo-card);
   border-radius: 50px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+  box-shadow: var(--sombra-card);
   margin: 20px auto 30px auto;
   max-width: 960px;
 }
 .header p { font-size: 14px; margin: 0; }
+/* opcional: tornar sticky no topo */
+@media (min-width: 0px){
+  .header{ position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px); background: rgba(255,255,255,.85); }
+}
+
+/* Tipografia utilitária para manter consistência entre telas */
+.page-title{ font-size: clamp(1.4rem, 2.6vw, 2.2rem); font-weight: 800; margin: 8px 0 6px; text-align:center; }
+.page-subtitle{ color: var(--cor-texto-secundario); margin: 0 0 12px; text-align:center; }
+.section-title{ font-size: clamp(1.1rem, 1.8vw, 1.4rem); font-weight: 700; margin: 10px 0; text-align:center; }
+ 
+/* util: conteúdo apenas para leitores de tela */
+.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
 
 /* 4. TELA DE LOGIN COM CARDS */
 .login-card-container {
@@ -76,8 +92,8 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
 }
 .login-card {
   background: var(--cor-fundo-card);
-  border-radius: 20px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
   width: 100%;
   max-width: 350px;
   padding: 25px;
@@ -86,9 +102,8 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
   border: 1px solid #E5E5E5;
   transition: all 0.2s ease-in-out;
 }
-.login-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+@media (hover:hover){
+  .login-card:hover { transform: translateY(-2px); box-shadow: var(--sombra-card-hover); }
 }
 .avatar {
   width: 50px;
@@ -120,16 +135,14 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
 .pillar-card {
   background: var(--cor-fundo-card);
   padding: 20px;
-  border-radius: 20px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
   text-align: center;
   transition: all 0.2s ease-in-out;
   border: 2px solid transparent;
 }
-.pillar-card.clickable { cursor: pointer; }
-.pillar-card.clickable:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(74, 144, 226, 0.2);
+@media (hover:hover){
+  .pillar-card.clickable:hover { transform: translateY(-2px); box-shadow: var(--sombra-card-hover); }
 }
 .pillar-card.disabled { opacity: 0.6; cursor: not-allowed; }
 .pillar-card.highlight { border-color: var(--cor-primaria); }
@@ -151,10 +164,12 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-.level-card.clickable:hover, .activity-list li.clickable:hover {
-  border-color: var(--cor-primaria);
-  background-color: #F0F8FF;
-  transform: scale(1.02);
+@media (hover:hover){
+  .level-card.clickable:hover, .activity-list li.clickable:hover {
+    border-color: var(--cor-primaria);
+    background-color: #F0F8FF;
+    transform: translateY(-1px);
+  }
 }
 .level-card h3 { font-size: 1.1em; }
 .level-card-stats {
@@ -181,8 +196,8 @@ h2 { text-align: center; font-weight: 700; color: var(--cor-texto-secundario); m
 }
 .student-card {
     background: var(--cor-fundo-card);
-    border-radius: 20px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra-card);
     padding: 20px;
     border: 1px solid #e9ecef;
 }
@@ -252,16 +267,22 @@ button {
   font-weight: 700;
   font-family: var(--fonte-titulo);
   transition: all 0.2s ease-in-out;
+  min-height: 44px; /* alvo mínimo mobile */
 }
-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+@media (hover:hover){
+  button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4); }
 }
 button:active {
   transform: scale(0.98);
 }
 .reset-button { background-color: var(--cor-perigo); }
 .back-button { background-color: var(--cor-texto-secundario); }
+.secondary-button{
+  background:#ECEFF6; color:#0f172a; border-radius:999px; padding:8px 14px; font-weight:700;
+}
+
+/* foco visível e acessível */
+:where(a,button,[tabindex]):focus{ outline:2px solid var(--cor-primaria); outline-offset:2px; }
 
 textarea {
   width: 100%;
@@ -353,8 +374,52 @@ textarea:focus {
     color: #D69E00;
 }
 .feedback-popup p, .collab-popup p {
-    font-size: 16px;
-    line-height: 1.6;
-    color: var(--cor-texto-principal);
-    margin-bottom: 25px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--cor-texto-principal);
+  margin-bottom: 25px;
+}
+
+/* ====== NOVO: Tiles reutilizáveis (usados no sandbox do professor) ====== */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr; /* mobile */
+  gap: 12px;
+}
+@media (min-width: 600px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
+
+.tile {
+  background: var(--cor-fundo-card);
+  border: 1px solid rgba(0,0,0,.05);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra-card);
+  padding: 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  cursor: pointer;
+  /* Evita herdar o 'color: white' do seletor global de button */
+  color: var(--cor-texto-principal);  
+}
+.tile-title { font-size: 1.05rem; font-weight: 800; line-height: 1.2; color: var(--cor-texto-principal); }
+.tile-subtitle { font-size: .875rem; color: var(--cor-texto-secundario); }
+
+/* Extra de especificidade, caso algum build mude a ordem dos estilos */
+button.tile { color: var(--cor-texto-principal); background: var(--cor-fundo-card); }
+
+@media (hover: hover) {
+  .tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sombra-card-hover);
+    border-color: rgba(0,0,0,.08);
+  }
+}
+
+/* Pequeno ajuste de respiro em telas bem pequenas */
+@media (max-width: 480px){
+  .container { padding: 16px 12px; }
+  .header { padding: 8px 12px; border-radius: 16px; }
 }

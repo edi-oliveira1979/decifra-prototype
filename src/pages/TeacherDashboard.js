@@ -19,6 +19,7 @@ const LevelSummary = ({ levelsData }) => {
     }
     return (
         <div className="level-summary">
+            {/* CORREÇÃO: Adicionamos .filter(Boolean) para remover 'null's antes da renderização */}
             {levelsData.map(level => {
                 let icon = null;
                 if (level.bestPerformanceStatus === 'completo') {
@@ -35,13 +36,13 @@ const LevelSummary = ({ levelsData }) => {
                     );
                 }
                 return null;
-            })}
+            }).filter(Boolean)}
         </div>
     );
 };
 
 // --- COMPONENTE PRINCIPAL REFATORADO ---
-function TeacherDashboard({ user, pillars, levels: levelNames, allActivities }) {
+function TeacherDashboard({ user, pillars, levels: levelNames, allActivities, onBack }) {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [students, setStudents] = useState([]);
@@ -87,7 +88,8 @@ function TeacherDashboard({ user, pillars, levels: levelNames, allActivities }) 
   // Agora calcula o progresso detalhado por pilar e nível para cada aluno.
   const studentData = useMemo(() => {
     return students.map(student => {
-      const studentProgress = progressRecords.filter(p => p.student_id === student.user_id);
+      // o payload de alunos tem { id, full_name }
+      const studentProgress = progressRecords.filter(p => p.student_id === student.id);
       const progressMap = studentProgress.reduce((acc, p) => {
         acc[p.activity_id] = p;
         return acc;
@@ -127,7 +129,7 @@ function TeacherDashboard({ user, pillars, levels: levelNames, allActivities }) 
       });
 
       return {
-        studentId: student.user_id,
+        studentId: student.id,
         studentName: student.full_name,
         pillars: pillarsData,
       };
@@ -141,7 +143,12 @@ function TeacherDashboard({ user, pillars, levels: levelNames, allActivities }) 
   return (
     <div className="container">
       <header className="section">
-        <h1>Dashboard do Professor</h1>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12}}>
+          <h1>Dashboard do Professor</h1>
+          {typeof onBack === 'function' && (
+            <button className="secondary-button" onClick={onBack}>⟵ Início do Professor</button>
+          )}
+        </div>
         <h2 className="muted">
           Acompanhamento da Turma
         </h2>

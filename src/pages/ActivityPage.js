@@ -1,48 +1,75 @@
 // src/pages/ActivityPage.js
 import React, { useState, useEffect } from 'react';
-import { analyzeActivityAnswer, analyzeWithAI, saveActivityProgress } from '../services/progressService';
+// import { analyzeActivityAnswer, analyzeWithAI, saveActivityProgress } from '../services/progressService';
+import { analyzeWithAI, saveActivityProgress } from '../services/progressService';
+import { analyzeOffline } from '../services/offlineAnalysisService';
+import { fetchExpectedForActivity } from '../services/progressService';
 
-function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBack }) {
+function ActivityPage({
+  activityId,
+  allActivities,
+  user,
+  onProgressUpdate,
+  onBack,
+  isTeacherSandbox = false, // ← NOVO: habilita “modo professor (sandbox)”
+}) {
+  if (!activityId) {
+    return <div className="container"><h2>Selecione uma atividade para começar.</h2></div>;
+  }
   const activity = allActivities.find(a => a.id === activityId);
   
   const [answer, setAnswer] = useState('');
   const [helpLevel, setHelpLevel] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [showCollabPopup, setShowCollabPopup] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackResult, setFeedbackResult] = useState(null);
   
-  const [showCollabPopup, setShowCollabPopup] = useState(false);
+  const [expected, setExpected] = useState(null); // ← NOVO: armazena gabarito pedagógico
 
   useEffect(() => {
     setAnswer('');
     setHelpLevel(0);
+    setExpected(null);
   }, [activityId]);
 
   const handleSubmit = async () => {
-    if (!answer) {
-      alert('Por favor, digite uma resposta.');
-      return;
-    }
-    setIsLoading(true);
+      if (!answer) {
+        alert('Por favor, digite uma resposta.');
+        return;
+      }
+      setIsLoading(true);
 
-    let analysis;
+      try {
+        // --- TENTATIVA ONLINE ---
+        // Verificamos se o navegador se considera 'online'
+        if (navigator.onLine) {
+          console.log("Online: Tentando análise via backend...");
+          const analysis = await analyzeWithAI(activity.id, answer);
 
-    // --- LÓGICA DO MENTOR HÍBRIDO ---
-    if (navigator.onLine) {
-      console.log("Online: Usando análise com IA.");
-      analysis = await analyzeWithAI(activityId, answer);
-    } else {
-      console.log("Offline: Usando análise semântica local.");
-      analysis = await analyzeActivityAnswer(activityId, answer);
-    }
+          // Verificamos se o fallback do backend foi acionado ou se a IA respondeu
+          if (analysis) {
+              setFeedbackResult(analysis);
+              setShowFeedbackModal(true);
+              setIsLoading(false);
+              return; // Encerra a função aqui, pois tivemos uma resposta do backend
+          }
+        }
+        // Se estivermos offline ou a chamada 'analyzeWithAI' falhar, o código continua para o fallback
+        throw new Error("Offline ou falha na API, usando análise local.");
 
-    //const analysis = await analyzeActivityAnswer(activityId, answer);
-    
-    setFeedbackResult(analysis);
-    setShowFeedbackModal(true);
-    setIsLoading(false);
-  };
+      } catch (error) {
+        // --- FALLBACK OFFLINE ---
+        console.warn(error.message);
+        
+        const offlineResult = analyzeOffline(answer, activity);
+
+        // Usamos os setters corretos do seu componente
+        setFeedbackResult(offlineResult);
+        setShowFeedbackModal(true);
+        setIsLoading(false);
+      }
+  };  
 
   const handleCloseFeedback = async () => {
     setShowFeedbackModal(false);
@@ -55,17 +82,19 @@ function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBac
         feedback: feedbackResult.feedback,
       };
 
-      if (typeof onProgressUpdate === 'function') {
-        onProgressUpdate(activityId, progressDetails);
+      // No modo sandbox (professor “como aluno”), NÃO persistimos progresso.
+      if (!isTeacherSandbox) {
+        if (typeof onProgressUpdate === 'function') {
+          onProgressUpdate(activityId, progressDetails);
+        }
+        await saveActivityProgress({
+          activity_id: activityId,
+          status: progressDetails.status,
+          help_level: progressDetails.helpLevel,
+          student_answer: progressDetails.answer,
+          feedback_given: progressDetails.feedback,
+        });
       }
-
-      await saveActivityProgress({
-        activity_id: activityId,
-        status: progressDetails.status,
-        help_level: progressDetails.helpLevel,
-        student_answer: progressDetails.answer,
-        feedback_given: progressDetails.feedback,
-      });
 
       if (feedbackResult.status === 'done') {
         onBack();
@@ -82,6 +111,16 @@ function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBac
     }
   };
 
+  // NOVO: carrega o “gabarito pedagógico” (somente para professores em sandbox)
+  const handleShowExpected = async () => {
+    try {
+      const data = await fetchExpectedForActivity(activity.id);
+      setExpected(data || {});
+    } catch (e) {
+      setExpected({ error: 'Não foi possível carregar o gabarito.' });
+    }
+  };
+  
   const renderHelpContent = () => {
     if (helpLevel === 0 || !activity?.ajuda) return null;
     return (
@@ -105,6 +144,21 @@ function ActivityPage({ activityId, allActivities, user, onProgressUpdate, onBac
 
   return (
     <div className="container">
+      {/* NOVO: Ferramentas de Professor (sandbox) */}
+      {isTeacherSandbox && (
+        <div className="teacher-tools" style={{ display:'flex', gap:12, alignItems:'center', marginBottom:12 }}>
+          <button onClick={handleShowExpected}>Ver gabarito pedagógico</button>
+          {expected && (
+            <details style={{ marginLeft: 8 }}>
+              <summary>Ver JSON de regras/conceitos</summary>
+              <pre className="code" style={{ marginTop: 8, maxHeight: 280, overflow: 'auto' }}>
+                {JSON.stringify(expected, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
+      
       {showFeedbackModal && feedbackResult && (
         <div className="feedback-popup-overlay">
           <div className="feedback-popup">
