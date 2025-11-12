@@ -197,15 +197,15 @@ function App() {
     }
   };
 
-  const handleProgressUpdate = (activityId, progressDetails) => {
-    setStudentProgress(prevProgress => {
-      const newActivityData = {
-        ...prevProgress.activityData,
-        [activityId]: progressDetails,
-      };
-      return { activityData: newActivityData };
-    });
-  };
+  //const handleProgressUpdate = (activityId, progressDetails) => {
+  // setStudentProgress(prevProgress => {
+  //    const newActivityData = {
+  //      ...prevProgress.activityData,
+  //      [activityId]: progressDetails,
+  //    };
+  //    return { activityData: newActivityData };#
+  //  });
+  //};
   
   const goToRegister = () => setView('register');
   const goToLogin = () => setView('login');

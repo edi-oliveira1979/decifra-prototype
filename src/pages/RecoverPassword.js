@@ -1,5 +1,5 @@
 // src/pages/RecoverPassword.js
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export default function RecoverPassword({ onDone }) {
@@ -27,7 +27,7 @@ export default function RecoverPassword({ onDone }) {
     setBusy(true);
     setMsg('');
     try {
-      const { data, error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setMsg('Senha atualizada com sucesso! Redirecionando...');
       setTimeout(() => {
